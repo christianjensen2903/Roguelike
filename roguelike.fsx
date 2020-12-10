@@ -5,7 +5,7 @@ type Color = System.ConsoleColor
 
 type Canvas (rows: int, cols: int) =
 
-    let mutable screen = Array2D.create rows cols (' ', Color.Blue, Color.Red)
+    let mutable screen = Array2D.create rows cols (' ', Color.White, Color.Red)
 
     member this.Set (x: int, y: int, c: char, fg: Color, bg: Color) =
         screen.[x,y] <- (c, bg, fg)
