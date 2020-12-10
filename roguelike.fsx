@@ -12,30 +12,26 @@ type Canvas (rows: int, cols: int) =
 
     member this.Show () =
         System.Console.Clear ()
-        
+
         for x = 0 to Array2D.length1 screen - 1 do
             for y = 0 to Array2D.length2 screen - 1 do
                 let c, fg, bg = screen.[x,y]
-                // printfn "%A %A %A" c fg bg
-                System.Console.ResetColor()
                 System.Console.ForegroundColor <- fg
                 System.Console.BackgroundColor <- bg
-                System.Console.SetCursorPosition(x,y)
                 System.Console.Write(c)
-
-            // System.Console.WriteLine()
-
+                System.Console.ResetColor()
+            System.Console.Write("\n")
 
 let test = Canvas (10,10)
 
-// test.Show ()
+test.Show ()
 
-// test.Set (3, 4, ' ', Color.White, Color.Blue)
+test.Set (3, 4, ' ', Color.White, Color.Blue)
 // test.Set (2, 2, ' ', Color.White, Color.Blue)
 // test.Set (3, 4, ' ', Color.White, Color.Red)
 
 // // Tegner en lang streg når man shower for anden gang. Hvilket ikke er meningen
-// test.Show ()
+test.Show ()
 
 [<AbstractClass>]
 type Entity () =
