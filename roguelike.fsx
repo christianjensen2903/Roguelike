@@ -92,32 +92,15 @@ type Player (x:int, y:int, canvas: Canvas) =
         canvas.Set(x, y, "🥰", Color.Green, Color.Black)
         canvas.Show (x,y)
     
-    member this.HandleKeypress (key: System.ConsoleKeyInfo) =
+    member this.HandleKeypress () =
         let x, y = this.currentPosition
+        let key = System.Console.ReadKey()
         match key.Key with
         | System.ConsoleKey.UpArrow when x > 0 -> this.MoveTo (x - 1, y)
         | System.ConsoleKey.DownArrow when x < worldSizeX - 1 -> this.MoveTo (x + 1, y)
         | System.ConsoleKey.LeftArrow when y > 0 -> this.MoveTo (x, y - 1)
         | System.ConsoleKey.RightArrow when y < worldSizeY - 1 -> this.MoveTo (x, y + 1)
         | _ -> ()
-
-        // if key.Key =  then
-        //     if playerX - 1 >= 0 then
-        //         player.MoveTo (playerX - 1, playerY)
-        //     else ()
-        // else if key.Key = System.ConsoleKey.DownArrow then
-        //     if playerX + 1 <= (Array2D.length1 this.world) - 1 then
-        //         player.MoveTo (playerX + 1, playerY)
-        //     else ()
-        // else if key.Key = System.ConsoleKey.LeftArrow then
-        //     if playerY - 1 >= 0 then
-        //         player.MoveTo (playerX, playerY - 1)
-        //     else ()
-        // else if key.Key = System.ConsoleKey.RightArrow then
-        //     if playerY + 1 <= (Array2D.length2 this.world) - 1 then
-        //         player.MoveTo (playerX, playerY + 1)
-        //     else ()
-        // else ()
 
 
 
@@ -195,6 +178,7 @@ type Exit () =
 
 type World (canvas: Canvas, x:int, y:int) =
     let mutable _world = Array2D.create x y (Grass () :> Entity)
+    let mutable _objects = []
     member this.world = _world
 
     member this.AddItem (item:Item, x:int, y:int) =
@@ -207,8 +191,11 @@ type World (canvas: Canvas, x:int, y:int) =
 
         let mutable gameEnded = false
         while not gameEnded do
-            let key = System.Console.ReadKey()
-            player.HandleKeypress key
+            
+            while System.Console.KeyAvailable = false do
+                System.Threading.Thread.Sleep(250)
+            
+            player.HandleKeypress ()
             
 
 
