@@ -119,7 +119,7 @@ type Wall (startPosition: (int*int)) =
     member this.position = startPosition
     default this.RenderOn (canvas: Canvas) =
         let x,y = this.position
-        canvas.Set(x, y, " ", Color.Black, Color.Black)
+        canvas.Set(x, y, "  ", Color.Black, Color.Black)
         canvas.Show (-1,-1)
 
 
