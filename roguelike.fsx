@@ -5,12 +5,12 @@ type Color = System.ConsoleColor
 
 type Canvas (rows: int, cols: int) =
 
-    let mutable screen = Array2D.create rows cols (' ', Color.Green, Color.Green)
+    let mutable screen = Array2D.create rows cols ("  ", Color.Green, Color.Green)
 
     member this.Get (x:int, y:int) =
         screen.[x,y]
 
-    member this.Set (x: int, y: int, c: char, fg: Color, bg: Color) =
+    member this.Set (x: int, y: int, c: string, fg: Color, bg: Color) =
         screen.[x,y] <- (c, bg, fg)
 
     member this.Show (posX, posY) =
@@ -80,13 +80,13 @@ type Player (x:int, y:int, canvas: Canvas) =
     member this.MoveTo (x: int, y: int) =
         let curX, curY = this.currentPosition
         let c, bg, fg = canvas.Get (curX, curY)
-        canvas.Set (curX, curY, ' ', fg, bg)
+        canvas.Set (curX, curY, "  ", fg, bg)
         position <- (x,y)
         this.RenderOn (canvas)
 
     default this.RenderOn (canvas: Canvas) =
         let x,y = this.currentPosition
-        canvas.Set(x, y, 'A', Color.Green, Color.Black)
+        canvas.Set(x, y, "🥰", Color.Green, Color.Black)
         canvas.Show (x,y)
 
 
@@ -119,7 +119,7 @@ type Wall (startPosition: (int*int)) =
     member this.position = startPosition
     default this.RenderOn (canvas: Canvas) =
         let x,y = this.position
-        canvas.Set(x, y, ' ', Color.Black, Color.Black)
+        canvas.Set(x, y, " ", Color.Black, Color.Black)
         canvas.Show (-1,-1)
 
 
@@ -196,11 +196,13 @@ type World (canvas: Canvas, x:int, y:int) =
                     player.MoveTo (playerX, playerY + 1)
                 else ()
             else ()
-        
-let test = Canvas (200,200)
 
-let worldSizeX = 200
-let worldSizeY = 200
+let worldSizeX = 100
+let worldSizeY = 100
+
+let test = Canvas (worldSizeX,worldSizeY)
+
+
 
 System.Console.Clear ()
 
