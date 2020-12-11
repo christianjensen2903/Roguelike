@@ -89,7 +89,7 @@ type InvItem () =
     override this.FullyOccupy = false
 
 
-type MeleeWeapon (name: string, icon: string, dmg: int, spellpower: int) =
+type MeleeWeapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
     inherit InvItem ()
 
     override this.name = name
@@ -98,12 +98,13 @@ type MeleeWeapon (name: string, icon: string, dmg: int, spellpower: int) =
 
     override this.stats =
        [ "Dmg.", dmg;
-          "Spell power", spellpower;]
-        |> Map.ofList;;
+          "Spell power", spellpower;
+          "Speed", speed]
+        |> Map.ofList
 
 
 
-    
+
 
 
 type Wall () =
