@@ -292,3 +292,106 @@ type Enemy () =
             
             this.MoveIn dir
 
+
+
+
+
+
+
+
+// MARK: Start Menu
+
+type StartMenu (canvas: Canvas) =
+
+    let mutable _selection = 0
+
+
+    member this.DrawMenu (options: string list) =
+       
+        let padding = 1
+        let optionsLength = List.length options
+        for i in 0 .. optionsLength - 1 do
+            let option = options.[i]
+            let mutable x = canvas.Cols / 2 - (String.length option) / 2
+            let y = canvas.Rows / 2 - optionsLength / 2 * (padding + 1) + i * (padding + 1)
+            
+            for char in Seq.toList option do
+
+                if _selection = i then
+                    // If selection is the same as option make text another color
+                    canvas.Set (x, y, string char, Color.DarkBlue, Color.Black) 
+                else
+                    canvas.Set (x, y, string char, Color.DarkBlue, Color.White)
+
+                x <- x + 1
+        
+        canvas.Show ()
+
+    member this.ControlMenu (options: string list) =
+        let mutable showMenu = true
+        while showMenu do
+            let key = System.Console.ReadKey()
+
+            match key.Key with
+            | System.ConsoleKey.UpArrow -> 
+                if _selection > 0 then 
+                    _selection <- _selection - 1
+            | System.ConsoleKey.DownArrow -> 
+                if _selection < List.length options - 1 then 
+                    _selection <- _selection + 1
+            | System.ConsoleKey.Enter ->
+                showMenu <- false
+            | _ -> ()
+
+            this.DrawMenu options
+        
+    member this.MenuScreen () =
+
+        let menuOptions = ["New Game"; "Continue Game"]
+
+        canvas.Show ()
+        this.DrawMenu menuOptions
+        
+        this.ControlMenu menuOptions
+
+        
+        match _selection with
+            | 0 ->
+                this.ClassScreen ()
+            | 1 ->
+                // Continue game
+                ()
+            | _ -> ()
+    
+    member this.ClassScreen () =
+
+        let classesOptions = ["Warrior"; "Hunter"; "Mage"]
+
+        canvas.ResetScreen ()
+        this.DrawMenu classesOptions
+
+        this.ControlMenu classesOptions
+        
+        // TODO: convert classes to fsharp classes
+        match _selection with
+            | 0 ->
+                // Select warrior
+                ()
+            | 1 ->
+                // Select hunter
+                ()
+            | 2 ->
+                // Select mage
+                ()
+            | _ -> ()
+
+
+let canvas = Canvas (20,40)
+
+let menu = StartMenu canvas
+
+menu.MenuScreen ()
+
+
+
+    
