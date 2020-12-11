@@ -33,6 +33,85 @@ test.Set (3, 4, ' ', Color.White, Color.Blue)
 // // Tegner en lang streg når man shower for anden gang. Hvilket ikke er meningen
 test.Show ()
 
+
+
+type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
+
+[<AbstractClass>]
+type RpgClass () =
+    abstract member startingWeapon: Weapon
+
+    abstract member spells: Spell list
+
+    abstract member statMultipliers: Map<Stat, int>
+
+
+type Hunter () =
+    inherit RpgClass ()
+
+    override this.startingWeapon = BasicBow
+
+    override this.spells =
+        [MultiShot;
+        FreezingShot;
+        Poisonshot]
+
+    override this.statMultipliers =
+        [Stat.Damage, 2;
+        Stat.Health, 2;
+        Stat.Spellpower, 1;
+        Stat.Armor, 2;
+        Stat.Speed, 2;
+        Stat.MagicResistance, 2;
+        Stat.Critchance, 2;
+        Stat.Critdamage, 2]
+        |> Map.ofList
+
+type Warrior () =
+    inherit RpgClass ()
+
+    override this.startingWeapon = BasicSword
+
+    override this.spells =
+        [MultiShot;
+        FreezingShot;
+        Poisonshot]
+
+    override this.statMultipliers =
+        [Stat.Damage, 3;
+        Stat.Health, 4;
+        Stat.Spellpower, 1;
+        Stat.Armor, 3;
+        Stat.Speed, 1;
+        Stat.MagicResistance, 3;
+        Stat.Critchance, 2;
+        Stat.Critdamage, 2]
+        |> Map.ofList
+
+type Mage () =
+    inherit RpgClass ()
+
+    override this.startingWeapon = BasicStaff
+
+    override this.spells =
+        [Fireblast;
+        Freezenova;
+        Lightningbolt]
+
+    override this.statMultipliers =
+        [Stat.Damage, 1;
+        Stat.Health, 1;
+        Stat.Spellpower, 4;
+        Stat.Armor, 1;
+        Stat.Speed, 2;
+        Stat.MagicResistance, 3;
+        Stat.Critchance, 1;
+        Stat.Critdamage, 1]
+        |> Map.ofList
+
+
+
+
 [<AbstractClass>]
 type Entity () =
     abstract member RenderOn: Canvas -> unit
