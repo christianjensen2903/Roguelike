@@ -60,25 +60,63 @@ type Player () =
         position <- (x,y)
 
 
+
+
+
 [<AbstractClass>]
-type Item () =
+type Object () =
     inherit Entity ()
 
     abstract member InteractWith: Player -> unit
 
     abstract member FullyOccupy: bool
+
+
+[<AbstractClass>]
+type InvItem () =
+    inherit Object ()
+
+    abstract member name: string
+
+    abstract member icon: string
+    
+    abstract member stats: Map<string, int>
+
+    override this.InteractWith (player: Player) =
+        // Pickup item -> add to inv 
+        ()
+
+    override this.FullyOccupy = false
+
+
+type MeleeWeapon (name: string, icon: string, dmg: int, spellpower: int) =
+    inherit InvItem ()
+
+    override this.name = name
+
+    override this.icon = icon
+
+    override this.stats =
+       [ "Dmg.", dmg;
+          "Spell power", spellpower;]
+        |> Map.ofList;;
+
+
+
     
 
+
 type Wall () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = ()
 
     override this.FullyOccupy = true
 
 
+
 type Water () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = player.Heal 2
 
@@ -86,7 +124,7 @@ type Water () =
 
 
 type Fire () =
-    inherit Item ()
+    inherit Object ()
 
     let mutable interactions = 0
     let mutable isBurning = true
@@ -100,7 +138,7 @@ type Fire () =
 
 
 type FleshEatingPlant () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = player.Damage 5
 
@@ -108,7 +146,7 @@ type FleshEatingPlant () =
 
 
 type Exit () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = 
         // Show end game notice
