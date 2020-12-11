@@ -2,15 +2,21 @@
 // open System
 
 type Color = System.ConsoleColor
+type Direction = Left | Right | Down | Up
+
 
 let worldSizeX = 75
 let worldSizeY = 75
-type Direction = Left | Right | Down | Up
+
 
 let randomNumber (lower: int) (upper: int) =
     let random = new System.Random()
     random.Next(lower, upper)
 
+
+
+
+// MARK: Canvas
 
 type Canvas (rows: int, cols: int) =
 
@@ -60,12 +66,21 @@ type Canvas (rows: int, cols: int) =
                 System.Console.Write("\n")
             System.Console.ResetColor()
         else ()
-        
+
+
+
+
+
+
+
+
 [<AbstractClass>]
 type Entity () =
     abstract member RenderOn: Canvas -> unit
     default this.RenderOn (canvas: Canvas) = ()
 
+
+// MARK: Player
 
 type Player (x:int, y:int, canvas: Canvas) =
     inherit Entity ()
@@ -111,6 +126,87 @@ type Player (x:int, y:int, canvas: Canvas) =
         | _ -> ()
 
 
+
+
+
+
+
+
+
+
+// MARK: Enemy
+type Enemy () =
+    inherit Entity ()
+
+    let mutable position = (0,0)
+    let mutable hitPoints = 10
+    let mutable isDead = false
+
+    member this.HitPoints = hitPoints
+
+    member this.IsDead = isDead
+
+    member this.Damage (dmg: int) =
+        hitPoints <- hitPoints - dmg
+    
+    member this.Heal (h: int) =
+        hitPoints <- hitPoints + h
+
+    member this.MoveIn (direction: Direction) =
+        let (x, y) = position
+
+        match direction with
+        | Direction.Up -> position <- (x, y-1)
+        | Direction.Down -> position <- (x, y+1)
+        | Direction.Left -> position <- (x-1, y)
+        | Direction.Right -> position <- (x+1, y)
+
+
+    member this.MoveTowards (player: Player) =
+        // Get positions
+        let (enemyX, enemyY) = position
+        let (playerX, playerY) = player.Position
+
+        // Calculate distance to player
+        let dx = enemyX - playerX
+        let dy = enemyY - playerY
+        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
+
+        let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
+
+        if (dis > 10) then  
+            // If player are to far away move random direction
+            let dirInd = randomNumber 0 (List.length directions)
+            let dir = directions.[dirInd]
+            this.MoveIn dir
+        
+        else
+            let mutable dir = Direction.Left
+
+            // Move in the direction with biggest difference in position
+            if (abs dx > abs dy) then
+                if (dx > 0) then
+                    dir <- Direction.Right
+                else
+                    dir <- Direction.Left
+            
+            else
+                if (dy > 0) then
+                    dir <- Direction.Down
+                else
+                    dir <- Direction.Up
+            
+            this.MoveIn dir
+
+
+
+
+
+
+
+
+
+// MARK: World objects
 
 [<AbstractClass>]
 type Item () =
@@ -184,6 +280,15 @@ type Exit () =
 
     override this.FullyOccupy = false
 
+
+
+
+
+
+
+
+// MARK: World
+
 type World (canvas: Canvas, x:int, y:int) =
     let mutable _world = Array2D.create x y (Grass () :> Entity)
     let mutable _objects = []
@@ -229,68 +334,6 @@ world.AddItem(wall4, 7, 7)
 world.Play ()
 
 
-type Enemy () =
-    inherit Entity ()
-
-    let mutable position = (0,0)
-    let mutable hitPoints = 10
-    let mutable isDead = false
-
-    member this.HitPoints = hitPoints
-
-    member this.IsDead = isDead
-
-    member this.Damage (dmg: int) =
-        hitPoints <- hitPoints - dmg
-    
-    member this.Heal (h: int) =
-        hitPoints <- hitPoints + h
-
-    member this.MoveIn (direction: Direction) =
-        let (x, y) = position
-
-        match direction with
-        | Direction.Up -> position <- (x, y-1)
-        | Direction.Down -> position <- (x, y+1)
-        | Direction.Left -> position <- (x-1, y)
-        | Direction.Right -> position <- (x+1, y)
-
-
-    member this.MoveTowards (player: Player) =
-        // Get positions
-        let (enemyX, enemyY) = position
-        let (playerX, playerY) = player.Position
-
-        // Calculate distance to player
-        let dx = enemyX - playerX
-        let dy = enemyY - playerY
-        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
-
-        let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
-
-        if (dis > 10) then  
-            // If player are to far away move random direction
-            let dirInd = randomNumber 0 (List.length directions)
-            let dir = directions.[dirInd]
-            this.MoveIn dir
-        
-        else
-            let mutable dir = Direction.Left
-
-            // Move in the direction with biggest difference in position
-            if (abs dx > abs dy) then
-                if (dx > 0) then
-                    dir <- Direction.Right
-                else
-                    dir <- Direction.Left
-            
-            else
-                if (dy > 0) then
-                    dir <- Direction.Down
-                else
-                    dir <- Direction.Up
-            
-            this.MoveIn dir
 
 
 
