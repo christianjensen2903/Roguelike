@@ -74,6 +74,8 @@ type Canvas (rows: int, cols: int) =
 
 
 
+
+
 [<AbstractClass>]
 type Entity () =
     abstract member RenderOn: Canvas -> unit
@@ -124,6 +126,8 @@ type Player (x:int, y:int, canvas: Canvas) =
         | System.ConsoleKey.LeftArrow when y > 0 -> this.MoveTo (x, y - 1)
         | System.ConsoleKey.RightArrow when y < worldSizeY - 1 -> this.MoveTo (x, y + 1)
         | _ -> ()
+
+
 
 
 
@@ -206,10 +210,11 @@ type Enemy () =
 
 
 
+
 // MARK: World objects
 
 [<AbstractClass>]
-type Item () =
+type Object () =
     inherit Entity ()
 
     abstract member InteractWith: Player -> unit
@@ -217,7 +222,7 @@ type Item () =
     abstract member FullyOccupy: bool
 
 type Grass () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = ()
 
@@ -227,7 +232,7 @@ type Grass () =
     
 
 type Wall (startPosition: (int*int)) =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = ()
 
@@ -241,7 +246,7 @@ type Wall (startPosition: (int*int)) =
 
 
 type Water () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = player.Heal 2
 
@@ -249,7 +254,7 @@ type Water () =
 
 
 type Fire () =
-    inherit Item ()
+    inherit Object ()
 
     let mutable interactions = 0
     let mutable isBurning = true
@@ -263,7 +268,7 @@ type Fire () =
 
 
 type FleshEatingPlant () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = player.Damage 5
 
@@ -271,7 +276,7 @@ type FleshEatingPlant () =
 
 
 type Exit () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (player: Player) = 
         // Show end game notice
@@ -294,9 +299,9 @@ type World (canvas: Canvas, x:int, y:int) =
     let mutable _objects = []
     member this.world = _world
 
-    member this.AddItem (item:Item, x:int, y:int) =
-        _world.[x,y] <- item :> Entity
-        item.RenderOn canvas
+    member this.AddObject (object:Object, x:int, y:int) =
+        _world.[x,y] <- object :> Entity
+        object.RenderOn canvas
 
     member this.Play () =
         let player = Player (10,50,canvas)
@@ -325,10 +330,10 @@ let wall2 = Wall ((5,5))
 let wall3 = Wall ((10,10))
 let wall4 = Wall ((7,7))
 
-world.AddItem(wall, 2, 2)
-world.AddItem(wall2, 5, 5)
-world.AddItem(wall3, 10, 10)
-world.AddItem(wall4, 7, 7)
+world.AddObject(wall, 2, 2)
+world.AddObject(wall2, 5, 5)
+world.AddObject(wall3, 10, 10)
+world.AddObject(wall4, 7, 7)
 
 
 world.Play ()
