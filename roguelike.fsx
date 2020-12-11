@@ -3,6 +3,9 @@
 
 type Color = System.ConsoleColor
 
+let worldSizeX = 75
+let worldSizeY = 75
+
 type Canvas (rows: int, cols: int) =
 
     let mutable screen = Array2D.create rows cols ("  ", Color.Green, Color.Green)
@@ -88,6 +91,33 @@ type Player (x:int, y:int, canvas: Canvas) =
         let x,y = this.currentPosition
         canvas.Set(x, y, "🥰", Color.Green, Color.Black)
         canvas.Show (x,y)
+    
+    member this.HandleKeypress (key: System.ConsoleKeyInfo) =
+        let x, y = this.currentPosition
+        match key.Key with
+        | System.ConsoleKey.UpArrow when x > 0 -> this.MoveTo (x - 1, y)
+        | System.ConsoleKey.DownArrow when x < worldSizeX - 1 -> this.MoveTo (x + 1, y)
+        | System.ConsoleKey.LeftArrow when y > 0 -> this.MoveTo (x, y - 1)
+        | System.ConsoleKey.RightArrow when y < worldSizeY - 1 -> this.MoveTo (x, y + 1)
+        | _ -> ()
+
+        // if key.Key =  then
+        //     if playerX - 1 >= 0 then
+        //         player.MoveTo (playerX - 1, playerY)
+        //     else ()
+        // else if key.Key = System.ConsoleKey.DownArrow then
+        //     if playerX + 1 <= (Array2D.length1 this.world) - 1 then
+        //         player.MoveTo (playerX + 1, playerY)
+        //     else ()
+        // else if key.Key = System.ConsoleKey.LeftArrow then
+        //     if playerY - 1 >= 0 then
+        //         player.MoveTo (playerX, playerY - 1)
+        //     else ()
+        // else if key.Key = System.ConsoleKey.RightArrow then
+        //     if playerY + 1 <= (Array2D.length2 this.world) - 1 then
+        //         player.MoveTo (playerX, playerY + 1)
+        //     else ()
+        // else ()
 
 
 
@@ -171,34 +201,16 @@ type World (canvas: Canvas, x:int, y:int) =
         _world.[x,y] <- item :> Entity
         item.RenderOn canvas
 
-    member this.play () =
+    member this.Play () =
         let player = Player (10,50,canvas)
         player.RenderOn canvas
 
         let mutable gameEnded = false
         while not gameEnded do
             let key = System.Console.ReadKey()
-            let playerX, playerY = player.currentPosition
-            if key.Key = System.ConsoleKey.UpArrow then
-                if playerX - 1 >= 0 then
-                    player.MoveTo (playerX - 1, playerY)
-                else ()
-            else if key.Key = System.ConsoleKey.DownArrow then
-                if playerX + 1 <= (Array2D.length1 this.world) - 1 then
-                    player.MoveTo (playerX + 1, playerY)
-                else ()
-            else if key.Key = System.ConsoleKey.LeftArrow then
-                if playerY - 1 >= 0 then
-                    player.MoveTo (playerX, playerY - 1)
-                else ()
-            else if key.Key = System.ConsoleKey.RightArrow then
-                if playerY + 1 <= (Array2D.length2 this.world) - 1 then
-                    player.MoveTo (playerX, playerY + 1)
-                else ()
-            else ()
+            player.HandleKeypress key
+            
 
-let worldSizeX = 100
-let worldSizeY = 100
 
 let test = Canvas (worldSizeX,worldSizeY)
 
@@ -219,4 +231,4 @@ world.AddItem(wall3, 10, 10)
 world.AddItem(wall4, 7, 7)
 
 
-world.play ()
+world.Play ()
