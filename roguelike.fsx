@@ -4,9 +4,10 @@
 type Color = System.ConsoleColor
 type Direction = Left | Right | Down | Up
 
-
 let worldSizeX = 75
 let worldSizeY = 75
+let screenSizeX = 50
+let screenSizeY = 10
 
 
 let randomNumber (lower: int) (upper: int) =
@@ -18,54 +19,74 @@ let randomNumber (lower: int) (upper: int) =
 
 // MARK: Canvas
 
-type Canvas (rows: int, cols: int) =
+type Canvas () =
 
-    let mutable screen = Array2D.create rows cols ("  ", Color.Green, Color.Green)
+    let mutable _screen = Array2D.create screenSizeY screenSizeX ("  ", Color.White, Color.DarkBlue)
+
+    member this.SetScreen screen = 
+        _screen <- screen
 
     member this.Get (x:int, y:int) =
-        screen.[x,y]
+        _screen.[y,x]
 
     member this.Set (x: int, y: int, c: string, fg: Color, bg: Color) =
-        screen.[x,y] <- (c, bg, fg)
+        _screen.[y,x] <- (c, bg, fg)
 
-    member this.Show (posX, posY) =
+    member this.Show () =
+
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
-        let mutable fromX = 0
-        let mutable toX = 0
-        let mutable fromY = 0
-        let mutable toY = 0
-        let radX = 10
-        let radY = 40
 
-        if posX >= 0 && posY >= 0 then
-            if posX - radX >= 0 then
-                fromX <- posX - radX
-            else fromX <- 0
-
-            if posX + radX <= Array2D.length1 screen - 1 then
-                toX <- posX + radX
-            else
-                toX <- Array2D.length1 screen - 1
-
-            if posY - radY >= 0 then
-                fromY <- posY - radY
-            else fromY <- 0
-
-            if posY + radY <= Array2D.length2 screen - 1 then
-                toY <- posY + radY
-            else
-                toY <- Array2D.length2 screen - 1
+        
+        for y = 0 to Array2D.length1 _screen - 1 do
+            for x = 0 to Array2D.length2 _screen - 1 do
+                let c, fg, bg = _screen.[y,x]
                 
-            for x = fromX to toX do
-                for y = fromY to toY do
-                    let c, fg, bg = screen.[x,y]
-                    System.Console.ForegroundColor <- fg
-                    System.Console.BackgroundColor <- bg
-                    System.Console.Write(c)
-                System.Console.Write("\n")
-            System.Console.ResetColor()
-        else ()
+                
+                System.Console.ForegroundColor <- fg
+
+                System.Console.BackgroundColor <- bg
+                    
+                System.Console.Write(c)
+            System.Console.Write("\n")
+        System.Console.ResetColor()
+        
+        // let mutable fromX = 0
+        // let mutable toX = 0
+        // let mutable fromY = 0
+        // let mutable toY = 0
+        // let radX = 10
+        // let radY = 40
+
+
+        // if posX >= 0 && posY >= 0 then
+        //     if posX - radX >= 0 then
+        //         fromX <- posX - radX
+        //     else fromX <- 0
+
+        //     if posX + radX <= Array2D.length1 screen - 1 then
+        //         toX <- posX + radX
+        //     else
+        //         toX <- Array2D.length1 screen - 1
+
+        //     if posY - radY >= 0 then
+        //         fromY <- posY - radY
+        //     else fromY <- 0
+
+        //     if posY + radY <= Array2D.length2 screen - 1 then
+        //         toY <- posY + radY
+        //     else
+        //         toY <- Array2D.length2 screen - 1
+                
+        //     for x = fromX to toX do
+        //         for y = fromY to toY do
+        //             let c, fg, bg = screen.[x,y]
+        //             System.Console.ForegroundColor <- fg
+        //             System.Console.BackgroundColor <- bg
+        //             System.Console.Write(c)
+        //         System.Console.Write("\n")
+        //     System.Console.ResetColor()
+        // else ()
 
 
 
@@ -78,55 +99,181 @@ type Canvas (rows: int, cols: int) =
 
 [<AbstractClass>]
 type Entity () =
-    abstract member RenderOn: Canvas -> unit
-    default this.RenderOn (canvas: Canvas) = ()
+    abstract member Update: unit -> unit
+    default this.Update () = ()
+
+    abstract member Icon: string
+    default this.Icon = "  "
+
+
+[<AbstractClass>]
+type Creature () =
+    inherit Entity ()
+
+    abstract member HitPoints: int with get, set
+
+    abstract member Position: (int*int) with get, set
+
+    abstract member IsDead: bool with get, set
+
+    abstract member Damage: int -> unit
+    
+    abstract member Heal: int -> unit
+
+
+[<AbstractClass>]
+type Object () =
+    inherit Entity ()
+
+    abstract member InteractWith: Creature -> unit
+
+    abstract member FullyOccupy: bool
+
+    abstract member Color: Color
+
+
+
+
+
+
+
+
+
+
+// MARK: World
+
+type World (canvas: Canvas, x:int, y:int, map: (Entity option * Object) [,]) =
+    let mutable _world = map
+    let mutable _objects = []
+
+    let mutable _player: Creature option = None
+
+    member this.world = _world
+
+    member this.AddObject (object: Object, x: int, y: int) =
+        _world.[y,x] <- (None, object)
+
+    member this.AddPlayer (player: Creature) = _player <- Some player
+
+    member this.MoveEntity (fromPos: (int * int), toPos: (int * int), entity: Entity) =
+        printfn "1 %A %A" fromPos toPos
+        let backgroundFrom = snd _world.[snd fromPos, fst fromPos]
+        let backgroundTo = snd _world.[snd toPos, fst toPos]
+        _world.[snd fromPos, fst fromPos] <- (None, backgroundFrom)
+        _world.[snd toPos, fst toPos] <- (Some entity, backgroundTo)
+
+    member this.worldCutOut =
+        
+        let playerX, playerY = 
+            if _player.IsSome then _player.Value.Position
+            else (10,10)
+
+        let fromX = 
+            if playerX - screenSizeX / 2 < 0 then
+                0
+            else playerX - screenSizeX / 2
+        
+        let fromY =
+            if playerY - screenSizeY / 2 < 0 then
+                0
+            else playerY - screenSizeY / 2
+        
+        let toX =
+            if playerX + screenSizeX / 2 > worldSizeX then
+                worldSizeX
+            else playerX + screenSizeX / 2
+        
+        let toY =
+            if playerY + screenSizeY / 2 > worldSizeY then
+                worldSizeY
+            else playerY + screenSizeY / 2
+
+        let GetBlock (item: Entity option, background: Object) =
+            let char =
+                match item with
+                | Some x -> x.Icon
+                | None -> "  "
+            (char, Color.White, background.Color)
+        
+        (Array2D.map GetBlock _world).[fromY..toY, fromX..toX]
+
+
+
+
+
+    member this.Play () =
+
+        canvas.SetScreen this.worldCutOut
+        canvas.Show ()
+
+        let mutable gameEnded = false
+        while not gameEnded do
+
+            while System.Console.KeyAvailable = false do
+                System.Threading.Thread.Sleep(250)
+            
+            if _player.IsSome then _player.Value.Update ()
+            canvas.SetScreen this.worldCutOut
+            canvas.Show ()
+
+
+
+
+
+
+
 
 
 // MARK: Player
 
-type Player (x:int, y:int, canvas: Canvas) =
-    inherit Entity ()
+type Player (x:int, y:int, world: World) =
+    inherit Creature ()
 
-    let mutable position = (x,y)
-    let mutable hitPoints = 10
-    let mutable isDead = false
+    let mutable _position = (x,y)
+    let mutable _hitPoints = 10
+    let mutable _isDead = false
 
-    member this.currentPosition = position
+    override this.HitPoints
+        with get () = _hitPoints
+        and set (value) = _hitPoints <- value
 
-    member this.HitPoints = hitPoints
+    override this.Position
+        with get () = _position
+        and set (value) = _position <- value
 
-    member this.Position = position
+    override this.IsDead
+        with get () = _isDead
+        and set (value) = _isDead <- value
 
-    member this.IsDead = isDead
-
-    member this.Damage (dmg: int) =
-        hitPoints <- hitPoints - dmg
+    override this.Damage (dmg: int) =
+        _hitPoints <- _hitPoints - dmg
     
-    member this.Heal (h: int) =
-        hitPoints <- hitPoints + h
+    override this.Heal (h: int) =
+        _hitPoints <- _hitPoints + h
 
     member this.MoveTo (x: int, y: int) =
-        let curX, curY = this.currentPosition
-        let c, bg, fg = canvas.Get (curX, curY)
-        canvas.Set (curX, curY, "  ", fg, bg)
-        position <- (x,y)
-        this.RenderOn (canvas)
+        let curX, curY = this.Position
+        // let c, bg, fg = canvas.Get (curX, curY)
+        // canvas.Set (curX, curY, "  ", fg, bg)
+        world.MoveEntity (this.Position, (x,y), this)
+        this.Position <- (x,y)
 
-    default this.RenderOn (canvas: Canvas) =
-        let x,y = this.currentPosition
-        canvas.Set(x, y, "🥰", Color.Green, Color.Black)
-        canvas.Show (x,y)
+        // this.RenderOn (canvas)
+
+    override this.Icon = "😇"
     
     member this.HandleKeypress () =
-        let x, y = this.currentPosition
+        let x, y = this.Position
         let key = System.Console.ReadKey()
         match key.Key with
-        | System.ConsoleKey.UpArrow when x > 0 -> this.MoveTo (x - 1, y)
-        | System.ConsoleKey.DownArrow when x < worldSizeX - 1 -> this.MoveTo (x + 1, y)
-        | System.ConsoleKey.LeftArrow when y > 0 -> this.MoveTo (x, y - 1)
-        | System.ConsoleKey.RightArrow when y < worldSizeY - 1 -> this.MoveTo (x, y + 1)
+        | System.ConsoleKey.UpArrow when y > 0 -> this.MoveTo (x, y - 1)
+        | System.ConsoleKey.DownArrow when y < worldSizeY - 1 -> this.MoveTo (x, y + 1)
+        | System.ConsoleKey.LeftArrow when x > 0 -> this.MoveTo (x - 1, y)
+        | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> this.MoveTo (x + 1, y)
         | _ -> ()
 
+    override this.Update () =
+        this.HandleKeypress ()
 
 
 
@@ -139,36 +286,44 @@ type Player (x:int, y:int, canvas: Canvas) =
 
 
 // MARK: Enemy
-type Enemy () =
-    inherit Entity ()
+type Enemy (x:int, y:int) =
+    inherit Creature ()
 
-    let mutable position = (0,0)
-    let mutable hitPoints = 10
-    let mutable isDead = false
+    let mutable _position = (x,y)
+    let mutable _hitPoints = 10
+    let mutable _isDead = false
 
-    member this.HitPoints = hitPoints
+    override this.HitPoints
+        with get () = _hitPoints
+        and set (value) = _hitPoints <- value
 
-    member this.IsDead = isDead
+    override this.Position
+        with get () = _position
+        and set (value) = _position <- value
 
-    member this.Damage (dmg: int) =
-        hitPoints <- hitPoints - dmg
+    override this.IsDead
+        with get () = _isDead
+        and set (value) = _isDead <- value
+
+    override this.Damage (dmg: int) =
+        _hitPoints <- _hitPoints - dmg
     
-    member this.Heal (h: int) =
-        hitPoints <- hitPoints + h
+    override this.Heal (h: int) =
+        _hitPoints <- _hitPoints + h
 
     member this.MoveIn (direction: Direction) =
-        let (x, y) = position
+        let (x, y) = _position
 
         match direction with
-        | Direction.Up -> position <- (x, y-1)
-        | Direction.Down -> position <- (x, y+1)
-        | Direction.Left -> position <- (x-1, y)
-        | Direction.Right -> position <- (x+1, y)
+        | Direction.Up -> _position <- (x, y-1)
+        | Direction.Down -> _position <- (x, y+1)
+        | Direction.Left -> _position <- (x-1, y)
+        | Direction.Right -> _position <- (x+1, y)
 
 
     member this.MoveTowards (player: Player) =
         // Get positions
-        let (enemyX, enemyY) = position
+        let (enemyX, enemyY) = _position
         let (playerX, playerY) = player.Position
 
         // Calculate distance to player
@@ -213,44 +368,37 @@ type Enemy () =
 
 // MARK: World objects
 
-[<AbstractClass>]
-type Object () =
-    inherit Entity ()
-
-    abstract member InteractWith: Player -> unit
-
-    abstract member FullyOccupy: bool
-
 type Grass () =
     inherit Object ()
 
-    override this.InteractWith (player: Player) = ()
+    override this.InteractWith (creature: Creature) = ()
 
     override this.FullyOccupy = false
 
-    default this.RenderOn (canvas: Canvas) = ()
+    override this.Color = Color.Green
+
     
 
 type Wall (startPosition: (int*int)) =
     inherit Object ()
 
-    override this.InteractWith (player: Player) = ()
+    override this.InteractWith (creature: Creature) = ()
 
     override this.FullyOccupy = true
 
     member this.position = startPosition
-    default this.RenderOn (canvas: Canvas) =
-        let x,y = this.position
-        canvas.Set(x, y, "  ", Color.Black, Color.Black)
-        canvas.Show (-1,-1)
+    
+    override this.Color = Color.Black
 
 
 type Water () =
     inherit Object ()
 
-    override this.InteractWith (player: Player) = player.Heal 2
+    override this.InteractWith (creature: Creature) = creature.Heal 2
 
     override this.FullyOccupy = false
+
+    override this.Color = Color.Blue
 
 
 type Fire () =
@@ -259,71 +407,59 @@ type Fire () =
     let mutable interactions = 0
     let mutable isBurning = true
 
-    override this.InteractWith (player: Player) =
-        if isBurning then player.Damage 1
+    override this.InteractWith (creature: Creature) =
+        if isBurning then creature.Damage 1
 
         if interactions >= 5 then isBurning <- false
 
     override this.FullyOccupy = false
 
+    override this.Color = Color.Red
+
 
 type FleshEatingPlant () =
     inherit Object ()
 
-    override this.InteractWith (player: Player) = player.Damage 5
+    override this.InteractWith (creature: Creature) = creature.Damage 5
 
     override this.FullyOccupy = true
+
+    override this.Color = Color.DarkGreen
 
 
 type Exit () =
     inherit Object ()
 
-    override this.InteractWith (player: Player) = 
+    override this.InteractWith (creature: Creature) = 
         // Show end game notice
         System.Console.Clear ()
         printfn "You won!!!!"
 
     override this.FullyOccupy = false
 
+    override this.Color = Color.White
 
 
 
 
 
 
-
-// MARK: World
-
-type World (canvas: Canvas, x:int, y:int) =
-    let mutable _world = Array2D.create x y (Grass () :> Entity)
-    let mutable _objects = []
-    member this.world = _world
-
-    member this.AddObject (object:Object, x:int, y:int) =
-        _world.[x,y] <- object :> Entity
-        object.RenderOn canvas
-
-    member this.Play () =
-        let player = Player (10,50,canvas)
-        player.RenderOn canvas
-
-        let mutable gameEnded = false
-        while not gameEnded do
-            
-            while System.Console.KeyAvailable = false do
-                System.Threading.Thread.Sleep(250)
-            
-            player.HandleKeypress ()
             
 
 
-let test = Canvas (worldSizeX,worldSizeY)
+let test = Canvas ()
 
 
 
 System.Console.Clear ()
 
-let world = World (test, worldSizeX, worldSizeY)
+
+let map = Array2D.create worldSizeX worldSizeY (None, Grass () :> Object)
+
+let world = World (test, worldSizeX, worldSizeY, map)
+
+let player = Player (10, 10, world)
+world.AddPlayer player
 
 let wall = Wall ((2,2))
 let wall2 = Wall ((5,5))
@@ -349,96 +485,96 @@ world.Play ()
 
 // MARK: Start Menu
 
-type StartMenu (canvas: Canvas) =
+// type StartMenu (canvas: Canvas) =
 
-    let mutable _selection = 0
+//     let mutable _selection = 0
 
 
-    member this.DrawMenu (options: string list) =
+//     member this.DrawMenu (options: string list) =
        
-        let padding = 1
-        let optionsLength = List.length options
-        for i in 0 .. optionsLength - 1 do
-            let option = options.[i]
-            let mutable x = canvas.Cols / 2 - (String.length option) / 2
-            let y = canvas.Rows / 2 - optionsLength / 2 * (padding + 1) + i * (padding + 1)
+//         let padding = 1
+//         let optionsLength = List.length options
+//         for i in 0 .. optionsLength - 1 do
+//             let option = options.[i]
+//             let mutable x = worldSizeX / 2 - (String.length option) / 2
+//             let y = worldSizeY / 2 - optionsLength / 2 * (padding + 1) + i * (padding + 1)
             
-            for char in Seq.toList option do
+//             for char in Seq.toList option do
 
-                if _selection = i then
-                    // If selection is the same as option make text another color
-                    canvas.Set (x, y, string char, Color.DarkBlue, Color.Black) 
-                else
-                    canvas.Set (x, y, string char, Color.DarkBlue, Color.White)
+//                 if _selection = i then
+//                     // If selection is the same as option make text another color
+//                     canvas.Set (x, y, string char, Color.DarkBlue, Color.Black) 
+//                 else
+//                     canvas.Set (x, y, string char, Color.DarkBlue, Color.White)
 
-                x <- x + 1
+//                 x <- x + 1
         
-        canvas.Show ()
+//         canvas.Show ()
 
-    member this.ControlMenu (options: string list) =
-        let mutable showMenu = true
-        while showMenu do
-            let key = System.Console.ReadKey()
+//     member this.ControlMenu (options: string list) =
+//         let mutable showMenu = true
+//         while showMenu do
+//             let key = System.Console.ReadKey()
 
-            match key.Key with
-            | System.ConsoleKey.UpArrow -> 
-                if _selection > 0 then 
-                    _selection <- _selection - 1
-            | System.ConsoleKey.DownArrow -> 
-                if _selection < List.length options - 1 then 
-                    _selection <- _selection + 1
-            | System.ConsoleKey.Enter ->
-                showMenu <- false
-            | _ -> ()
+//             match key.Key with
+//             | System.ConsoleKey.UpArrow -> 
+//                 if _selection > 0 then 
+//                     _selection <- _selection - 1
+//             | System.ConsoleKey.DownArrow -> 
+//                 if _selection < List.length options - 1 then 
+//                     _selection <- _selection + 1
+//             | System.ConsoleKey.Enter ->
+//                 showMenu <- false
+//             | _ -> ()
 
-            this.DrawMenu options
+//             this.DrawMenu options
         
-    member this.MenuScreen () =
+//     member this.MenuScreen () =
 
-        let menuOptions = ["New Game"; "Continue Game"]
+//         let menuOptions = ["New Game"; "Continue Game"]
 
-        canvas.Show ()
-        this.DrawMenu menuOptions
+//         canvas.Show ()
+//         this.DrawMenu menuOptions
         
-        this.ControlMenu menuOptions
+//         this.ControlMenu menuOptions
 
         
-        match _selection with
-            | 0 ->
-                this.ClassScreen ()
-            | 1 ->
-                // Continue game
-                ()
-            | _ -> ()
+//         match _selection with
+//             | 0 ->
+//                 this.ClassScreen ()
+//             | 1 ->
+//                 // Continue game
+//                 ()
+//             | _ -> ()
     
-    member this.ClassScreen () =
+//     member this.ClassScreen () =
 
-        let classesOptions = ["Warrior"; "Hunter"; "Mage"]
+//         let classesOptions = ["Warrior"; "Hunter"; "Mage"]
 
-        canvas.ResetScreen ()
-        this.DrawMenu classesOptions
+//         canvas.ResetScreen ()
+//         this.DrawMenu classesOptions
 
-        this.ControlMenu classesOptions
+//         this.ControlMenu classesOptions
         
-        // TODO: convert classes to fsharp classes
-        match _selection with
-            | 0 ->
-                // Select warrior
-                ()
-            | 1 ->
-                // Select hunter
-                ()
-            | 2 ->
-                // Select mage
-                ()
-            | _ -> ()
+//         // TODO: convert classes to fsharp classes
+//         match _selection with
+//             | 0 ->
+//                 // Select warrior
+//                 ()
+//             | 1 ->
+//                 // Select hunter
+//                 ()
+//             | 2 ->
+//                 // Select mage
+//                 ()
+//             | _ -> ()
 
 
-let canvas = Canvas (20,40)
+// let canvas = Canvas (20,40)
 
-let menu = StartMenu canvas
+// let menu = StartMenu canvas
 
-menu.MenuScreen ()
+// menu.MenuScreen ()
 
 
 
