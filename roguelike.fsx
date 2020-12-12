@@ -154,6 +154,8 @@ type Player (x:int, y:int, canvas: Canvas) =
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+    
+    member this.Attack () = ()
 
     override this.Icon = "😇"
 
@@ -214,6 +216,7 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
     let mutable _hitPoints = 10
     let mutable _isDead = false
 
+
     override this.HitPoints
         with get () = _hitPoints
         and set (value) = _hitPoints <- value
@@ -231,6 +234,19 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+
+    member this.Attack () =
+        // Get positions
+        let (enemyX, enemyY) = _position
+        let (playerX, playerY) = player.Position
+
+        // Calculate distance to player
+        let dx = enemyX - playerX
+        let dy = enemyY - playerY
+        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
+
+        if dis <= 1 then
+            player.Damage 5
     
     override this.Icon = "🧟‍♀️"
 
@@ -307,6 +323,7 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
 
     override this.Update world =
         this.MoveTowardsPlayer ()
+        this.Attack ()
         this.RenderOn canvas
 
 
