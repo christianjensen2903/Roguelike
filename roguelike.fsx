@@ -167,7 +167,6 @@ type Player (x:int, y:int, canvas: Canvas) =
         let _, fg, bg = canvas.Get (oldX,oldY)
         let field = world.[y,x]
         let item = snd field
-        printfn "test: %A %A" (fst field).IsSome (item.FullyOccupy = false)
         if not (fst field).IsSome && item.FullyOccupy = false then
             canvas.Set(oldX, oldY, "  ", fg, bg)
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
@@ -254,22 +253,19 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
         | Direction.Down when oldY < worldSizeY - 2 -> newY <- oldY + 1
         | Direction.Left when oldX > 0 -> newX <- oldX - 1
         | Direction.Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
+        | _ -> ()
         
 
         let field = world.[newY,newX]
-        printfn "3 %A %A" newX newY
         let item = snd field
         
         if not (fst field).IsSome && item.FullyOccupy = false then
-            printfn "4 %A %A" newX newY
             canvas.Set(oldX, oldY, "  ", fg, bg)
-            printfn "5 %A %A" newX newY
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
             
             _position <- (newX,newY)
             item.InteractWith this
         else
-            printfn "6"
             ()
 
 
@@ -423,7 +419,7 @@ type World (canvas: Canvas, x:int, y:int) =
     member this.Play () =
 
         let player = Player (20,50,canvas)
-        let enemy = Enemy (3, 20, canvas, player, this.world)
+        let enemy = Enemy (0, 0, canvas, player, this.world)
 
         player.RenderOn canvas
         enemy.RenderOn canvas
@@ -433,11 +429,18 @@ type World (canvas: Canvas, x:int, y:int) =
         while not gameEnded do
 
             while System.Console.KeyAvailable = false do
-                // enemy.Update (_world)
+                enemy.Update (_world)
                 canvas.Show (fst player.Position, snd player.Position)
                 System.Threading.Thread.Sleep(250)
 
             player.Update (_world)
+
+            // if System.Console.KeyAvailable = true then
+            //     player.Update (_world)
+
+            // enemy.Update (_world)
+            // canvas.Show (fst player.Position, snd player.Position)
+            // System.Threading.Thread.Sleep(250)
             
             
  
