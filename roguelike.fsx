@@ -19,7 +19,7 @@ let randomNumber (lower: int) (upper: int) =
 
 type Canvas (rows: int, cols: int) =
 
-    let mutable _screen = Array2D.create cols rows ("  ", Color.White, Color.Green)
+    let mutable _screen = Array2D.create cols rows ("  ", Color.Green, Color.Green)
 
 
     member this.Get (x:int, y:int) =
@@ -50,30 +50,39 @@ type Canvas (rows: int, cols: int) =
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
 
-        let fromX = 
+        let fromX, toX = 
             if playerX - (screenSizeX / 2) < 0 then
-                0
-            else playerX - (screenSizeX / 2)
+                0, screenSizeX - 1
+            else if playerX + (screenSizeX / 2) > worldSizeX - 1 then
+                worldSizeX - 1 - screenSizeX, worldSizeX - 1
+            else playerX - (screenSizeX / 2), playerX + (screenSizeX / 2)
         
-        let fromY =
+        let fromY, toY = 
             if playerY - (screenSizeY / 2) < 0 then
-                0
-            else playerY - (screenSizeY / 2)
+                0, screenSizeY - 1
+            else if playerY + (screenSizeY / 2) > worldSizeY - 1 then
+                worldSizeY - 1 - screenSizeY, worldSizeY - 1
+            else playerY - (screenSizeY / 2), playerY + (screenSizeY / 2)
         
-        let toX =
-            if playerX + (screenSizeX / 2) > worldSizeX - 1 then
-                worldSizeX - 1
-            else playerX + (screenSizeX / 2)
+        // let fromY =
+        //     if playerY - (screenSizeY / 2) < 0 then
+        //         0
+        //     else playerY - (screenSizeY / 2)
         
-        let toY =
-            if playerY + (screenSizeY / 2) > worldSizeY - 1 then
-                worldSizeY - 1
-            else playerY + (screenSizeY / 2)
-
-        printfn "%A %A %A %A" fromX toX fromY toY
-        for y = fromY to toY do
-            for x = fromX to toX do
-                let c, fg, bg = _screen.[y,x]
+        // let toX =
+        //     if playerX + (screenSizeX / 2) > worldSizeX - 1 then
+        //         worldSizeX - 1
+        //     else playerX + (screenSizeX / 2)
+        
+        // let toY =
+        //     if playerY + (screenSizeY / 2) > worldSizeY - 1 then
+        //         worldSizeY - 1
+        //     else playerY + (screenSizeY / 2)
+        let cutout = _screen.[fromY .. toY, fromX .. toX]
+        printfn "%A %A %A %A" fromY toY fromX toX
+        for y = 0 to screenSizeY - 1 do
+            for x = 0 to screenSizeX - 1 do
+                let c, fg, bg = cutout.[y,x]
                 System.Console.ForegroundColor <- fg
                 System.Console.BackgroundColor <- bg
                 System.Console.Write(c)
