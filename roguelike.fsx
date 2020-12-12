@@ -4,7 +4,7 @@
 type Color = System.ConsoleColor
 type Direction = Left | Right | Down | Up
 
-let worldSizeX = 200
+let worldSizeX = 100
 let worldSizeY = 200
 let screenSizeX = 50
 let screenSizeY = 30
@@ -13,8 +13,6 @@ let screenSizeY = 30
 let randomNumber (lower: int) (upper: int) =
     let random = new System.Random()
     random.Next(lower, upper)
-
-
 
 
 // MARK: Canvas
@@ -35,7 +33,6 @@ type Canvas (rows: int, cols: int) =
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
 
-        
         for y = 0 to Array2D.length1 _screen - 1 do
             for x = 0 to Array2D.length2 _screen - 1 do
                 let c, fg, bg = _screen.[y,x]
@@ -52,37 +49,30 @@ type Canvas (rows: int, cols: int) =
     member this.Show (playerX, playerY) =
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
-        // let mutable fromX = 0
-        // let mutable toX = 0
-        // let mutable fromY = 0
-        // let mutable toY = 0
-        // let radX = 10
-        // let radY = 40
-
 
         let fromX = 
-            if playerX - screenSizeX / 2 < 0 then
+            if playerX - (screenSizeX / 2) < 0 then
                 0
-            else playerX - screenSizeX / 2
+            else playerX - (screenSizeX / 2)
         
         let fromY =
-            if playerY - screenSizeY / 2 < 0 then
+            if playerY - (screenSizeY / 2) < 0 then
                 0
-            else playerY - screenSizeY / 2
+            else playerY - (screenSizeY / 2)
         
         let toX =
-            if playerX + screenSizeX / 2 > worldSizeX - 1 then
+            if playerX + (screenSizeX / 2) > worldSizeX - 1 then
                 worldSizeX - 1
-            else playerX + screenSizeX / 2
+            else playerX + (screenSizeX / 2)
         
         let toY =
-            if playerY + screenSizeY / 2 > worldSizeY - 1 then
+            if playerY + (screenSizeY / 2) > worldSizeY - 1 then
                 worldSizeY - 1
-            else playerY + screenSizeY / 2
+            else playerY + (screenSizeY / 2)
 
         printfn "%A %A %A %A" fromX toX fromY toY
-        for y = fromX to toX do
-            for x = fromY to toY do
+        for y = fromY to toY do
+            for x = fromX to toX do
                 let c, fg, bg = _screen.[y,x]
                 System.Console.ForegroundColor <- fg
                 System.Console.BackgroundColor <- bg
@@ -208,6 +198,10 @@ type Player (x:int, y:int, canvas: Canvas) =
          canvas.Show (x,y)
 
     member this.MoveTo (x: int, y: int) =
+        let oldX,oldY = this.Position
+        let _, fg, bg = canvas.Get (oldX,oldY)
+        canvas.Set(oldX, oldY, "  ", fg, bg)
+        printfn "%A %A" x y
         this.Position <- (x,y)
     
 
