@@ -4,10 +4,10 @@
 type Color = System.ConsoleColor
 type Direction = Left | Right | Down | Up
 
-let worldSizeX = 75
-let worldSizeY = 75
+let worldSizeX = 200
+let worldSizeY = 200
 let screenSizeX = 50
-let screenSizeY = 10
+let screenSizeY = 30
 
 
 let randomNumber (lower: int) (upper: int) =
@@ -19,12 +19,10 @@ let randomNumber (lower: int) (upper: int) =
 
 // MARK: Canvas
 
-type Canvas () =
+type Canvas (rows: int, cols: int) =
 
-    let mutable _screen = Array2D.create screenSizeY screenSizeX ("  ", Color.White, Color.DarkBlue)
+    let mutable _screen = Array2D.create cols rows ("  ", Color.White, Color.Green)
 
-    member this.SetScreen screen = 
-        _screen <- screen
 
     member this.Get (x:int, y:int) =
         _screen.[y,x]
@@ -32,7 +30,7 @@ type Canvas () =
     member this.Set (x: int, y: int, c: string, fg: Color, bg: Color) =
         _screen.[y,x] <- (c, bg, fg)
 
-    member this.Show () =
+    member this.ShowMenu () =
 
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
@@ -48,10 +46,12 @@ type Canvas () =
                 System.Console.BackgroundColor <- bg
                     
                 System.Console.Write(c)
-            System.Console.ResetColor()
             System.Console.Write("\n")
         System.Console.ResetColor()
-        
+    
+    member this.Show (playerX, playerY) =
+        System.Console.CursorVisible <- false
+        System.Console.SetCursorPosition(0,0)
         // let mutable fromX = 0
         // let mutable toX = 0
         // let mutable fromY = 0
@@ -60,33 +60,66 @@ type Canvas () =
         // let radY = 40
 
 
+        let fromX = 
+            if playerX - screenSizeX / 2 < 0 then
+                0
+            else playerX - screenSizeX / 2
+        
+        let fromY =
+            if playerY - screenSizeY / 2 < 0 then
+                0
+            else playerY - screenSizeY / 2
+        
+        let toX =
+            if playerX + screenSizeX / 2 > worldSizeX - 1 then
+                worldSizeX - 1
+            else playerX + screenSizeX / 2
+        
+        let toY =
+            if playerY + screenSizeY / 2 > worldSizeY - 1 then
+                worldSizeY - 1
+            else playerY + screenSizeY / 2
+
+        printfn "%A %A %A %A" fromX toX fromY toY
+        for y = fromX to toX do
+            for x = fromY to toY do
+                let c, fg, bg = _screen.[y,x]
+                System.Console.ForegroundColor <- fg
+                System.Console.BackgroundColor <- bg
+                System.Console.Write(c)
+            System.Console.Write("\n")
+        System.Console.ResetColor()
+
         // if posX >= 0 && posY >= 0 then
         //     if posX - radX >= 0 then
         //         fromX <- posX - radX
         //     else fromX <- 0
 
-        //     if posX + radX <= Array2D.length1 screen - 1 then
+        //     if posX + radX <= Array2D.length1 _screen - 1 then
         //         toX <- posX + radX
         //     else
-        //         toX <- Array2D.length1 screen - 1
+        //         toX <- Array2D.length1 _screen - 1
 
         //     if posY - radY >= 0 then
         //         fromY <- posY - radY
         //     else fromY <- 0
 
-        //     if posY + radY <= Array2D.length2 screen - 1 then
+        //     if posY + radY <= Array2D.length2 _screen - 1 then
+        //         printfn "%A %A" posY radY
         //         toY <- posY + radY
         //     else
-        //         toY <- Array2D.length2 screen - 1
-                
-        //     for x = fromX to toX do
-        //         for y = fromY to toY do
-        //             let c, fg, bg = screen.[x,y]
-        //             System.Console.ForegroundColor <- fg
-        //             System.Console.BackgroundColor <- bg
-        //             System.Console.Write(c)
-        //         System.Console.Write("\n")
-        //     System.Console.ResetColor()
+        //         printfn "%A" (Array2D.length2 _screen)
+        //         toY <- Array2D.length2 _screen - 1
+            
+            // printfn "%A %A %A %A" fromX toX fromY toY
+            // for y = fromX to toX do
+            //     for x = fromY to toY do
+            //         let c, fg, bg = _screen.[y,x]
+            //         System.Console.ForegroundColor <- fg
+            //         System.Console.BackgroundColor <- bg
+            //         System.Console.Write(c)
+            //     System.Console.Write("\n")
+            // System.Console.ResetColor()
         // else ()
 
 
@@ -100,6 +133,9 @@ type Canvas () =
 
 [<AbstractClass>]
 type Entity () =
+    abstract member RenderOn: Canvas -> unit
+    default this.RenderOn (canvas: Canvas) = ()
+
     abstract member Update: unit -> unit
     default this.Update () = ()
 
@@ -122,101 +158,11 @@ type Creature () =
     abstract member Heal: int -> unit
 
 
-[<AbstractClass>]
-type Object () =
-    inherit Entity ()
-
-    abstract member InteractWith: Creature -> unit
-
-    abstract member FullyOccupy: bool
-
-    abstract member Color: Color
 
 
 
 
 
-
-
-
-
-
-// MARK: World
-
-type World (canvas: Canvas, x:int, y:int, map: (Entity option * Object) [,]) =
-    let mutable _world = map
-    let mutable _objects = []
-
-    let mutable _player: Creature option = None
-
-    member this.world = _world
-
-    member this.AddObject (object: Object, x: int, y: int) =
-        _world.[y,x] <- (None, object)
-
-    member this.AddPlayer (player: Creature) = _player <- Some player
-
-    member this.MoveEntity (fromPos: (int * int), toPos: (int * int), entity: Entity) =
-        let backgroundFrom = snd _world.[snd fromPos, fst fromPos]
-        let backgroundTo = snd _world.[snd toPos, fst toPos]
-        _world.[snd fromPos, fst fromPos] <- (None, backgroundFrom)
-        _world.[snd toPos, fst toPos] <- (Some entity, backgroundTo)
-
-    member this.worldCutOut =
-        
-        let playerX, playerY = 
-            if _player.IsSome then _player.Value.Position
-            else (10,10)
-
-        let fromX = 
-            if playerX - screenSizeX / 2 < 0 then
-                0
-            else playerX - screenSizeX / 2
-        
-        let fromY =
-            if playerY - screenSizeY / 2 < 0 then
-                0
-            else playerY - screenSizeY / 2
-        
-        let toX =
-            if playerX + screenSizeX / 2 > worldSizeX - 1 then
-                worldSizeX - 1
-            else playerX + screenSizeX / 2
-        
-        let toY =
-            if playerY + screenSizeY / 2 > worldSizeY - 1 then
-                worldSizeY - 1
-            else playerY + screenSizeY / 2
-
-        printfn "Player %A %A From %A %A To %A %A" playerX playerY fromX fromY toX toY
-
-        let GetBlock (item: Entity option, background: Object) =
-            let char =
-                match item with
-                | Some x -> x.Icon
-                | None -> "  "
-            (char, Color.White, background.Color)
-        
-        (Array2D.map GetBlock _world).[fromY..toY, fromX..toX]
-
-
-
-
-
-    member this.Play () =
-
-        canvas.SetScreen this.worldCutOut
-        canvas.Show ()
-
-        let mutable gameEnded = false
-        while not gameEnded do
-
-            while System.Console.KeyAvailable = false do
-                System.Threading.Thread.Sleep(250)
-            
-            if _player.IsSome then _player.Value.Update ()
-            canvas.SetScreen this.worldCutOut
-            canvas.Show ()
 
 
 
@@ -228,7 +174,7 @@ type World (canvas: Canvas, x:int, y:int, map: (Entity option * Object) [,]) =
 
 // MARK: Player
 
-type Player (x:int, y:int, world: World) =
+type Player (x:int, y:int, canvas: Canvas) =
     inherit Creature ()
 
     let mutable _position = (x,y)
@@ -253,17 +199,18 @@ type Player (x:int, y:int, world: World) =
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
 
-    member this.MoveTo (x: int, y: int) =
-        let curX, curY = this.Position
-        // let c, bg, fg = canvas.Get (curX, curY)
-        // canvas.Set (curX, curY, "  ", fg, bg)
-        world.MoveEntity (this.Position, (x,y), this)
-        this.Position <- (x,y)
-
-        // this.RenderOn (canvas)
-
     override this.Icon = "😇"
+
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         let _, fg, bg = canvas.Get (x,y)
+         canvas.Set(x, y, this.Icon, fg, bg)
+         canvas.Show (x,y)
+
+    member this.MoveTo (x: int, y: int) =
+        this.Position <- (x,y)
     
+
     member this.HandleKeypress () =
         let x, y = this.Position
         let key = System.Console.ReadKey()
@@ -276,7 +223,7 @@ type Player (x:int, y:int, world: World) =
 
     override this.Update () =
         this.HandleKeypress ()
-
+        this.RenderOn (canvas)
 
 
 
@@ -312,6 +259,12 @@ type Enemy (x:int, y:int) =
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         let _, fg, bg = canvas.Get (x,y)
+         canvas.Set(x, y, this.Icon, fg, bg)
+         canvas.Show (x,y)
 
     member this.MoveIn (direction: Direction) =
         let (x, y) = _position
@@ -367,13 +320,23 @@ type Enemy (x:int, y:int) =
 
 
 
+[<AbstractClass>]
+type Item () =
+    inherit Entity ()
+
+    abstract member InteractWith: Player -> unit
+
+    abstract member FullyOccupy: bool
+
+    abstract member Color: Color
+
 
 // MARK: World objects
 
 type Grass () =
-    inherit Object ()
+    inherit Item ()
 
-    override this.InteractWith (creature: Creature) = ()
+    override this.InteractWith (player: Player) = ()
 
     override this.FullyOccupy = false
 
@@ -382,21 +345,25 @@ type Grass () =
     
 
 type Wall (startPosition: (int*int)) =
-    inherit Object ()
+    inherit Item ()
 
-    override this.InteractWith (creature: Creature) = ()
+    override this.InteractWith (player: Player) = ()
 
     override this.FullyOccupy = true
 
     member this.position = startPosition
+
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.position
+         canvas.Set(x, y, "  ", Color.Black, Color.Black)
     
     override this.Color = Color.Black
 
 
 type Water () =
-    inherit Object ()
+    inherit Item ()
 
-    override this.InteractWith (creature: Creature) = creature.Heal 2
+    override this.InteractWith (player: Player) = player.Heal 2
 
     override this.FullyOccupy = false
 
@@ -404,13 +371,13 @@ type Water () =
 
 
 type Fire () =
-    inherit Object ()
+    inherit Item ()
 
     let mutable interactions = 0
     let mutable isBurning = true
 
-    override this.InteractWith (creature: Creature) =
-        if isBurning then creature.Damage 1
+    override this.InteractWith (player: Player) =
+        if isBurning then player.Damage 1
 
         if interactions >= 5 then isBurning <- false
 
@@ -420,9 +387,9 @@ type Fire () =
 
 
 type FleshEatingPlant () =
-    inherit Object ()
+    inherit Item ()
 
-    override this.InteractWith (creature: Creature) = creature.Damage 5
+    override this.InteractWith (player: Player) = player.Damage 5
 
     override this.FullyOccupy = true
 
@@ -430,9 +397,9 @@ type FleshEatingPlant () =
 
 
 type Exit () =
-    inherit Object ()
+    inherit Item ()
 
-    override this.InteractWith (creature: Creature) = 
+    override this.InteractWith (player: Player) = 
         // Show end game notice
         System.Console.Clear ()
         printfn "You won!!!!"
@@ -446,32 +413,56 @@ type Exit () =
 
 
 
+
+// MARK: World
+
+type World (canvas: Canvas, x:int, y:int) =
+    let mutable _world = Array2D.create x y (Grass () :> Entity)
+
+    member this.world = _world
+
+    member this.AddItem (item: Item, x:int, y:int) =
+         _world.[x,y] <- item :> Entity
+         item.RenderOn canvas
+
+
+
+    member this.Play () =
+
+        let player = Player (10,50,canvas)
+        player.RenderOn canvas
+        canvas.Show (fst player.Position, snd player.Position)
+
+        let mutable gameEnded = false
+        while not gameEnded do
+
+            while System.Console.KeyAvailable = false do
+                System.Threading.Thread.Sleep(250)
+            
+            player.Update ()
+            canvas.Show (fst player.Position, snd player.Position)
+ 
+
+
+
             
 
 
-let test = Canvas ()
-
-
+let test = Canvas (200,200)
 
 System.Console.Clear ()
 
-
-let map = Array2D.create worldSizeX worldSizeY (None, Grass () :> Object)
-
-let world = World (test, worldSizeX, worldSizeY, map)
-
-let player = Player (10, 10, world)
-world.AddPlayer player
+let world = World (test, worldSizeX, worldSizeY)
 
 let wall = Wall ((2,2))
 let wall2 = Wall ((5,5))
 let wall3 = Wall ((10,10))
 let wall4 = Wall ((7,7))
 
-world.AddObject(wall, 2, 2)
-world.AddObject(wall2, 5, 5)
-world.AddObject(wall3, 10, 10)
-world.AddObject(wall4, 7, 7)
+world.AddItem(wall, 2, 2)
+world.AddItem(wall2, 5, 5)
+world.AddItem(wall3, 10, 10)
+world.AddItem(wall4, 7, 7)
 
 
 world.Play ()
