@@ -427,6 +427,44 @@ type Grass () =
 type Wall (startPosition: (int*int)) =
     inherit Item ()
 
+[<AbstractClass>]
+type InvItem () =
+    inherit Object ()
+
+    abstract member name: string
+
+    abstract member icon: string
+    
+    abstract member stats: Map<string, int>
+
+    override this.InteractWith (player: Player) =
+        // Pickup item -> add to inv 
+        ()
+
+    override this.FullyOccupy = false
+
+
+type MeleeWeapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
+    inherit InvItem ()
+
+    override this.name = name
+
+    override this.icon = icon
+
+    override this.stats =
+       [ "Dmg.", dmg;
+          "Spell power", spellpower;
+          "Speed", speed]
+        |> Map.ofList
+
+
+
+
+
+
+type Wall () =
+    inherit Object ()
+
     override this.InteractWith (creature: Creature) = ()
 
     override this.FullyOccupy = true
@@ -440,8 +478,9 @@ type Wall (startPosition: (int*int)) =
     override this.Color = Color.Black
 
 
+
 type Water () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (creature: Creature) = creature.Heal 2
 
@@ -473,7 +512,7 @@ type Fire (startPosition: (int*int)) =
 
 
 type FleshEatingPlant () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (creature: Creature) = creature.Damage 5
 
@@ -483,7 +522,7 @@ type FleshEatingPlant () =
 
 
 type Exit () =
-    inherit Item ()
+    inherit Object ()
 
     override this.InteractWith (creature: Creature) = 
         // Show end game notice
