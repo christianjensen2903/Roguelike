@@ -48,6 +48,7 @@ type Canvas () =
                 System.Console.BackgroundColor <- bg
                     
                 System.Console.Write(c)
+            System.Console.ResetColor()
             System.Console.Write("\n")
         System.Console.ResetColor()
         
@@ -156,7 +157,6 @@ type World (canvas: Canvas, x:int, y:int, map: (Entity option * Object) [,]) =
     member this.AddPlayer (player: Creature) = _player <- Some player
 
     member this.MoveEntity (fromPos: (int * int), toPos: (int * int), entity: Entity) =
-        printfn "1 %A %A" fromPos toPos
         let backgroundFrom = snd _world.[snd fromPos, fst fromPos]
         let backgroundTo = snd _world.[snd toPos, fst toPos]
         _world.[snd fromPos, fst fromPos] <- (None, backgroundFrom)
@@ -179,14 +179,16 @@ type World (canvas: Canvas, x:int, y:int, map: (Entity option * Object) [,]) =
             else playerY - screenSizeY / 2
         
         let toX =
-            if playerX + screenSizeX / 2 > worldSizeX then
-                worldSizeX
+            if playerX + screenSizeX / 2 > worldSizeX - 1 then
+                worldSizeX - 1
             else playerX + screenSizeX / 2
         
         let toY =
-            if playerY + screenSizeY / 2 > worldSizeY then
-                worldSizeY
+            if playerY + screenSizeY / 2 > worldSizeY - 1 then
+                worldSizeY - 1
             else playerY + screenSizeY / 2
+
+        printfn "Player %A %A From %A %A To %A %A" playerX playerY fromX fromY toX toY
 
         let GetBlock (item: Entity option, background: Object) =
             let char =
