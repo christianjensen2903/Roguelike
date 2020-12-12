@@ -117,7 +117,8 @@ and [<AbstractClass>] Item () =
 
     abstract member Color: Color
 
-
+    abstract member Update: (Entity option * Item) [,] -> unit
+    default this.Update (world: (Entity option * Item) [,]) = ()
 
 
 
@@ -160,16 +161,17 @@ type Player (x:int, y:int, canvas: Canvas) =
          let x,y = this.Position
          let _, fg, bg = canvas.Get (x,y)
          canvas.Set(x, y, this.Icon, fg, bg)
-         canvas.Show (x,y)
 
     member this.MoveTo (x: int, y: int, world: (Entity option * Item) [,]) =
         let oldX,oldY = this.Position
         let _, fg, bg = canvas.Get (oldX,oldY)
         let field = world.[y,x]
         let item = snd field
-
-        if not (fst field).IsSome && item.FullyOccupy = false then
+        printfn "test: %A %A" (fst field).IsSome (item.FullyOccupy = false)
+        if not (fst field).IsSome || item.FullyOccupy = false then
             canvas.Set(oldX, oldY, "  ", fg, bg)
+            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+            world.[y,x] <- (Some (this :> Entity), item)
             this.Position <- (x,y)
             item.InteractWith this
         else
@@ -203,9 +205,12 @@ type Player (x:int, y:int, canvas: Canvas) =
 
 
 // MARK: Enemy
-type Enemy (x:int, y:int) =
+type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option * Item) [,]) =
     inherit Creature ()
 
+    let world = world
+    let canvas = canvas
+    let player = player
     let mutable _position = (x,y)
     let mutable _hitPoints = 10
     let mutable _isDead = false
@@ -227,24 +232,47 @@ type Enemy (x:int, y:int) =
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+    
+    override this.Icon = "🧟‍♀️"
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
          let _, fg, bg = canvas.Get (x,y)
          canvas.Set(x, y, this.Icon, fg, bg)
-         canvas.Show (x,y)
 
     member this.MoveIn (direction: Direction) =
-        let (x, y) = _position
+        
+        let oldX,oldY = _position
+        printfn "1 %A %A" oldX oldY
+        let mutable newX, newY = oldX, oldY
+        let _, fg, bg = canvas.Get (oldX,oldY)
+        printfn "2 %A %A" oldX oldY
 
         match direction with
-        | Direction.Up -> _position <- (x, y-1)
-        | Direction.Down -> _position <- (x, y+1)
-        | Direction.Left -> _position <- (x-1, y)
-        | Direction.Right -> _position <- (x+1, y)
+        | Direction.Up when oldY > 0 -> newY <- oldY - 1
+        | Direction.Down when oldY < worldSizeY - 2 -> newY <- oldY + 1
+        | Direction.Left when oldX > 0 -> newX <- oldX - 1
+        | Direction.Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
+        
+
+        let field = world.[newY,newX]
+        printfn "3 %A %A" newX newY
+        let item = snd field
+        
+        if not (fst field).IsSome || item.FullyOccupy = false then
+            printfn "4 %A %A" newX newY
+            canvas.Set(oldX, oldY, "  ", fg, bg)
+            printfn "5 %A %A" newX newY
+            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+            world.[y,x] <- (Some (this :> Entity), item)
+            _position <- (newX,newY)
+            item.InteractWith this
+        else
+            printfn "6"
+            ()
 
 
-    member this.MoveTowards (player: Player) =
+    member this.MoveTowardsPlayer () =
         // Get positions
         let (enemyX, enemyY) = _position
         let (playerX, playerY) = player.Position
@@ -267,18 +295,22 @@ type Enemy (x:int, y:int) =
 
             // Move in the direction with biggest difference in position
             if (abs dx > abs dy) then
-                if (dx > 0) then
+                if (dx < 0) then
                     dir <- Direction.Right
                 else
                     dir <- Direction.Left
             
             else
-                if (dy > 0) then
+                if (dy < 0) then
                     dir <- Direction.Down
                 else
                     dir <- Direction.Up
             
             this.MoveIn dir
+
+    override this.Update world =
+        this.MoveTowardsPlayer ()
+        this.RenderOn canvas
 
 
 
@@ -389,18 +421,24 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (10,50,canvas)
+        let player = Player (20,50,canvas)
+        let enemy = Enemy (3, 20, canvas, player, this.world)
+
         player.RenderOn canvas
+        enemy.RenderOn canvas
         canvas.Show (fst player.Position, snd player.Position)
 
         let mutable gameEnded = false
         while not gameEnded do
 
             while System.Console.KeyAvailable = false do
+                // enemy.Update (_world)
+                canvas.Show (fst player.Position, snd player.Position)
                 System.Threading.Thread.Sleep(250)
-            
+
             player.Update (_world)
-            canvas.Show (fst player.Position, snd player.Position)
+            
+            
  
 
 
