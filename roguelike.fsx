@@ -168,7 +168,7 @@ type Player (x:int, y:int, canvas: Canvas) =
         let field = world.[y,x]
         let item = snd field
         printfn "test: %A %A" (fst field).IsSome (item.FullyOccupy = false)
-        if not (fst field).IsSome || item.FullyOccupy = false then
+        if not (fst field).IsSome && item.FullyOccupy = false then
             canvas.Set(oldX, oldY, "  ", fg, bg)
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
             world.[y,x] <- (Some (this :> Entity), item)
@@ -238,6 +238,7 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
          let _, fg, bg = canvas.Get (x,y)
+         world.[y,x] <- (Some (this :> Entity), snd world.[y,x])
          canvas.Set(x, y, this.Icon, fg, bg)
 
     member this.MoveIn (direction: Direction) =
@@ -259,12 +260,12 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
         printfn "3 %A %A" newX newY
         let item = snd field
         
-        if not (fst field).IsSome || item.FullyOccupy = false then
+        if not (fst field).IsSome && item.FullyOccupy = false then
             printfn "4 %A %A" newX newY
             canvas.Set(oldX, oldY, "  ", fg, bg)
             printfn "5 %A %A" newX newY
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
-            world.[y,x] <- (Some (this :> Entity), item)
+            
             _position <- (newX,newY)
             item.InteractWith this
         else
