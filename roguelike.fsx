@@ -105,13 +105,10 @@ type Creature () =
     
     abstract member Heal: int -> unit
 
-    abstract member Update: (Entity option * Entity) [,] -> unit
-    default this.Update (world: (Entity option * Entity) [,]) = ()
+    abstract member Update: (Entity option * Item) [,] -> unit
+    default this.Update (world: (Entity option * Item) [,]) = ()
 
-
-
-[<AbstractClass>]
-type Item () =
+and [<AbstractClass>] Item () =
     inherit Entity ()
 
     abstract member InteractWith: Creature -> unit
@@ -119,7 +116,6 @@ type Item () =
     abstract member FullyOccupy: bool
 
     abstract member Color: Color
-
 
 
 
@@ -166,21 +162,21 @@ type Player (x:int, y:int, canvas: Canvas) =
          canvas.Set(x, y, this.Icon, fg, bg)
          canvas.Show (x,y)
 
-    member this.MoveTo (x: int, y: int, world: (Entity option * Entity) [,]) =
+    member this.MoveTo (x: int, y: int, world: (Entity option * Item) [,]) =
         let oldX,oldY = this.Position
         let _, fg, bg = canvas.Get (oldX,oldY)
-        printfn "%A %A" x y
-        let field: (Entity option * Entity) = world.[y,x]
-        let item = snd field :?> Item
+        let field = world.[y,x]
+        let item = snd field
 
         if not (fst field).IsSome && item.FullyOccupy = false then
             canvas.Set(oldX, oldY, "  ", fg, bg)
             this.Position <- (x,y)
-        else
             item.InteractWith this
+        else
+            ()
     
 
-    member this.HandleKeypress (world: (Entity option * Entity) [,]) =
+    member this.HandleKeypress world =
         let mutable x, y = this.Position
         let key = System.Console.ReadKey()
 
@@ -193,7 +189,7 @@ type Player (x:int, y:int, canvas: Canvas) =
 
         this.MoveTo (x, y, world)
 
-    override this.Update (world: (Entity option * Entity) [,]) =
+    override this.Update world =
         this.HandleKeypress world
         this.RenderOn (canvas)
 
@@ -329,11 +325,13 @@ type Water () =
     override this.Color = Color.Blue
 
 
-type Fire () =
+type Fire (startPosition: (int*int)) =
     inherit Item ()
 
     let mutable interactions = 0
     let mutable isBurning = true
+
+    member this.position = startPosition
 
     override this.InteractWith (creature: Creature) =
         if isBurning then creature.Damage 1
@@ -343,6 +341,10 @@ type Fire () =
     override this.FullyOccupy = false
 
     override this.Color = Color.Red
+
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.position
+         canvas.Set(x, y, "  ", Color.Red, Color.Red)
 
 
 type FleshEatingPlant () =
@@ -376,12 +378,12 @@ type Exit () =
 // MARK: World
 
 type World (canvas: Canvas, x:int, y:int) =
-    let mutable _world: (Entity option * Entity) [,] = Array2D.create x y (None, (Grass () :> Entity))
+    let mutable _world: (Entity option * Item) [,] = Array2D.create x y (None, (Grass () :> Item))
 
     member this.world = _world
 
     member this.AddItem (item: Item, x:int, y:int) =
-         _world.[y,x] <- (fst _world.[y,x], item :> Entity)
+         _world.[y,x] <- (fst _world.[y,x], item)
          item.RenderOn canvas
 
 
@@ -415,7 +417,7 @@ let world = World (test, worldSizeX, worldSizeY)
 let wall = Wall ((2,2))
 let wall2 = Wall ((5,5))
 let wall3 = Wall ((10,10))
-let wall4 = Wall ((7,7))
+let wall4 = Fire ((7,7))
 
 world.AddItem(wall, 2, 2)
 world.AddItem(wall2, 5, 5)
