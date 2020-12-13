@@ -82,6 +82,128 @@ type Canvas (rows: int, cols: int) =
 
 
 
+[<AbstractClass>]
+type Entity () =
+    abstract member RenderOn: Canvas -> unit
+    default this.RenderOn (canvas: Canvas) = ()
+
+    abstract member Update: unit -> unit
+    default this.Update () = ()
+
+    abstract member Icon: string
+    default this.Icon = "  "
+
+    
+
+
+[<AbstractClass>]
+type Creature () =
+    inherit Entity ()
+
+    abstract member Position: (int * int) with get, set  
+
+    abstract member HitPoints: int with get, set
+
+    abstract member IsDead: bool with get, set
+
+    abstract member Damage: int -> unit
+    
+    abstract member Heal: int -> unit
+
+
+and [<AbstractClass>] Item () =
+    inherit Entity ()
+
+    abstract member Position: (int * int)
+    default this.Position = (0,0)
+
+    abstract member InteractWith: Creature -> unit
+
+    abstract member FullyOccupy: bool
+
+
+
+
+
+
+
+
+[<AbstractClass>]
+type Spell () =
+    abstract member baseDmg: int
+
+
+type MultiShot () =
+    inherit Spell ()
+    override this.baseDmg = 5
+
+type FreezingShot () =
+    inherit Spell ()
+    override this.baseDmg = 5
+
+type Poisonshot () =
+    inherit Spell ()
+    override this.baseDmg = 5
+
+type Fireblast () =
+    inherit Spell ()
+    override this.baseDmg = 5
+
+type Freezenova () =
+    inherit Spell ()
+    override this.baseDmg = 5
+
+type Lightningbolt () =
+    inherit Spell ()
+    override this.baseDmg = 5
+
+
+
+
+
+
+
+[<AbstractClass>]
+type InvItem () =
+    inherit Item ()
+
+    abstract member name: string
+
+    abstract member icon: string
+    
+    abstract member stats: Map<string, int>
+
+    override this.InteractWith (creature: Creature) =
+        // Pickup item -> add to inv 
+        ()
+
+    override this.FullyOccupy = false
+
+
+type Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
+    inherit InvItem ()
+
+    let mutable _position = (0,0)
+    override this.Position = _position
+
+    override this.name = name
+
+    override this.icon = icon
+
+    override this.stats =
+       [ "Dmg.", dmg;
+          "Spell power", spellpower;
+          "Speed", speed]
+        |> Map.ofList
+
+
+let basicBow = Weapon ("Basic Bow", "🏹", 2, 1, 2)
+let basicSword = Weapon ("Basic Sword", "🗡", 2, 1, 1)
+let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
+
+
+
+
 
 type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
 
@@ -97,12 +219,12 @@ type RpgClass () =
 type Hunter () =
     inherit RpgClass ()
 
-    override this.startingWeapon = BasicBow
+    override this.startingWeapon = basicBow
 
     override this.spells =
-        [MultiShot;
-        FreezingShot;
-        Poisonshot]
+        [MultiShot ();
+        FreezingShot ();
+        Poisonshot ()]
 
     override this.statMultipliers =
         [Stat.Damage, 2;
@@ -118,12 +240,12 @@ type Hunter () =
 type Warrior () =
     inherit RpgClass ()
 
-    override this.startingWeapon = BasicSword
+    override this.startingWeapon = basicSword
 
     override this.spells =
-        [MultiShot;
-        FreezingShot;
-        Poisonshot]
+        [MultiShot ();
+        FreezingShot ();
+        Poisonshot ()]
 
     override this.statMultipliers =
         [Stat.Damage, 3;
@@ -139,12 +261,12 @@ type Warrior () =
 type Mage () =
     inherit RpgClass ()
 
-    override this.startingWeapon = BasicStaff
+    override this.startingWeapon = basicStaff
 
     override this.spells =
-        [Fireblast;
-        Freezenova;
-        Lightningbolt]
+        [Fireblast ();
+        Freezenova ();
+        Lightningbolt ()]
 
     override this.statMultipliers =
         [Stat.Damage, 1;
@@ -159,45 +281,63 @@ type Mage () =
 
 
 
+type Projectile (startPosition: (int * int), direction: Direction, icon: string, dmg: int, canvas: Canvas, world: (Entity option * Item) [,]) =
+    inherit Item ()
 
-[<AbstractClass>]
-type Entity () =
-    abstract member RenderOn: Canvas -> unit
-    default this.RenderOn (canvas: Canvas) = ()
+    let mutable _removed = false
+    let mutable _position = startPosition
+    override this.Position = _position
+
+    override this.InteractWith (creature: Creature) = creature.Damage dmg
+
+    override this.FullyOccupy = false
+
+    member this.Remove () =
+        let x, y = _position
+        let _, fg, bg = canvas.Get (x,y)
+        canvas.Set(x, y, "  ", fg, bg)
+        world.[y, x] <- (None, snd world.[y, x])
+
+        
+
+    override this.Update () =
+        let oldX,oldY = _position
+        let mutable newX, newY = oldX, oldY
+        let _, fg, bg = canvas.Get (oldX,oldY)
+
+        match direction with
+        | Up when oldY > 0 -> newY <- oldY - 1
+        | Down when oldY < worldSizeY - 2 -> newY <- oldY + 1
+        | Left when oldX > 0 -> newX <- oldX - 1
+        | Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
+        | _ -> this.Remove ()
+
+        
+
+        let field = world.[newY,newX]
+        let item = snd field
+        
+        if not (fst field).IsSome && item.FullyOccupy = false then
+            canvas.Set(oldX, oldY, "  ", fg, bg)
+            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+            
+            _position <- (newX,newY)
+            
+        else if (fst field).IsSome then
+            match (fst field).Value with
+            | :? Creature -> this.InteractWith ((fst field).Value :?> Creature)
+            | _ -> ()
+
+            this.Remove ()
+
+        else
+            this.Remove ()
+            
 
 
-    abstract member Icon: string
-    default this.Icon = "  "
 
 
-[<AbstractClass>]
-type Creature () =
-    inherit Entity ()
 
-    abstract member HitPoints: int with get, set
-
-    abstract member Position: (int*int) with get, set
-
-    abstract member IsDead: bool with get, set
-
-    abstract member Damage: int -> unit
-    
-    abstract member Heal: int -> unit
-
-    abstract member Update: (Entity option * Item) [,] -> unit
-    default this.Update (world: (Entity option * Item) [,]) = ()
-
-and [<AbstractClass>] Item () =
-    inherit Entity ()
-
-    abstract member InteractWith: Creature -> unit
-
-    abstract member FullyOccupy: bool
-
-    abstract member Color: Color
-
-    abstract member Update: (Entity option * Item) [,] -> unit
-    default this.Update (world: (Entity option * Item) [,]) = ()
 
 
 
@@ -209,12 +349,13 @@ and [<AbstractClass>] Item () =
 
 // MARK: Player
 
-type Player (x:int, y:int, canvas: Canvas) =
+type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity option * Item) [,]) =
     inherit Creature ()
 
     let mutable _position = (x,y)
     let mutable _hitPoints = 10
     let mutable _isDead = false
+    let mutable _target: Enemy option = None
 
     override this.HitPoints
         with get () = _hitPoints
@@ -233,8 +374,50 @@ type Player (x:int, y:int, canvas: Canvas) =
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+
+
+    member this.SwitchTarget () =
+        let withinDistance (elm: (Entity option * Item)) =
+            let object = fst elm
+            if _target.IsSome then _target.Value.RemoveTarget ()
+
+            if object.IsSome then
+                match object.Value with
+                | :? Enemy ->
+                    // Get positions
+                    let enemy = object.Value :?> Enemy
+                    let (enemyX, enemyY) = enemy.Position
+                    let (playerX, playerY) = _position
+
+                    // Calculate distance to player
+                    let dx = enemyX - playerX
+                    let dy = enemyY - playerY
+                    let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
+                    if dis < 20 then Some enemy else None
+
+                | _ -> None
+            else None
+
+        let mutable nearbyEnemies: Enemy list = []
+        for x in [0..(Array2D.length1 world) - 1] do 
+                for y in [0..(Array2D.length2 world) - 1] do
+                    let enemy = withinDistance(world.[x, y])
+                    if enemy.IsSome then nearbyEnemies <- nearbyEnemies @ [enemy.Value]
+
+        if List.length nearbyEnemies - 1 >= 0 then
+            printfn "%A %A %A" nearbyEnemies (List.length nearbyEnemies) (randomNumber 0 (List.length nearbyEnemies - 1))
+            nearbyEnemies.[randomNumber 0 (List.length nearbyEnemies - 1)].Target ()
+        else ()
     
-    member this.Attack () = ()
+    member this.Attack () = 
+        match rpgClass with
+        | :? Hunter ->
+            printfn "ATTACK"
+        | :? Warrior ->
+            printfn "ATTACK"
+        | :? Mage -> 
+            printfn "ATTACK"
+        | _ -> ()
 
     override this.Icon = "😇"
 
@@ -243,7 +426,7 @@ type Player (x:int, y:int, canvas: Canvas) =
          let _, fg, bg = canvas.Get (x,y)
          canvas.Set(x, y, this.Icon, fg, bg)
 
-    member this.MoveTo (x: int, y: int, world: (Entity option * Item) [,]) =
+    member this.MoveTo (x: int, y: int) =
         let oldX,oldY = this.Position
         let _, fg, bg = canvas.Get (oldX,oldY)
         let field = world.[y,x]
@@ -258,7 +441,7 @@ type Player (x:int, y:int, canvas: Canvas) =
             ()
     
 
-    member this.HandleKeypress world =
+    member this.HandleKeypress () =
         let mutable x, y = this.Position
         let key = System.Console.ReadKey()
 
@@ -267,12 +450,13 @@ type Player (x:int, y:int, canvas: Canvas) =
         | System.ConsoleKey.DownArrow when y < worldSizeY - 1 -> y <- y + 1
         | System.ConsoleKey.LeftArrow when x > 0 -> x <- x - 1
         | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> x <- x + 1
+        | System.ConsoleKey.Tab -> this.SwitchTarget ()
         | _ -> ()
 
-        this.MoveTo (x, y, world)
+        this.MoveTo (x, y)
 
-    override this.Update world =
-        this.HandleKeypress world
+    override this.Update () =
+        this.HandleKeypress ()
         this.RenderOn (canvas)
 
 
@@ -285,7 +469,7 @@ type Player (x:int, y:int, canvas: Canvas) =
 
 
 // MARK: Enemy
-type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option * Item) [,]) =
+and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option * Item) [,]) =
     inherit Creature ()
 
     let world = world
@@ -294,6 +478,7 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
     let mutable _position = (x,y)
     let mutable _hitPoints = 10
     let mutable _isDead = false
+    let mutable _isTarget = false
 
 
     override this.HitPoints
@@ -313,6 +498,9 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+
+    member this.Target () = _isTarget <- true
+    member this.RemoveTarget () = _isTarget <- false
 
     member this.Attack () =
         // Get positions
@@ -333,7 +521,11 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
          let x,y = this.Position
          let _, fg, bg = canvas.Get (x,y)
          world.[y,x] <- (Some (this :> Entity), snd world.[y,x])
-         canvas.Set(x, y, this.Icon, fg, bg)
+
+         if _isTarget then
+            canvas.Set(x, y, this.Icon, Color.Red, bg)
+         else
+            canvas.Set(x, y, this.Icon, fg, bg)
 
     member this.MoveIn (direction: Direction) =
         
@@ -355,7 +547,8 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
         let item = snd field
         
         if not (fst field).IsSome && item.FullyOccupy = false then
-            canvas.Set(oldX, oldY, "  ", fg, bg)
+            (snd world.[oldY, oldX]).RenderOn canvas
+            // canvas.Set(oldX, oldY, "  ", fg, bg)
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
             
             _position <- (newX,newY)
@@ -400,7 +593,7 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
             
             this.MoveIn dir
 
-    override this.Update world =
+    override this.Update () =
         this.MoveTowardsPlayer ()
         this.Attack ()
         this.RenderOn canvas
@@ -413,89 +606,61 @@ type Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option 
 
 // MARK: World objects
 
-type Grass () =
+type Grass (startPosition) =
     inherit Item ()
+
+    override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) = ()
 
     override this.FullyOccupy = false
 
-    override this.Color = Color.Green
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         canvas.Set(x, y, "  ", Color.Green, Color.Green)
 
-    
 
-type Wall (startPosition: (int*int)) =
+
+
+
+type Wall (startPosition) =
     inherit Item ()
 
-[<AbstractClass>]
-type InvItem () =
-    inherit Object ()
-
-    abstract member name: string
-
-    abstract member icon: string
-    
-    abstract member stats: Map<string, int>
-
-    override this.InteractWith (player: Player) =
-        // Pickup item -> add to inv 
-        ()
-
-    override this.FullyOccupy = false
-
-
-type MeleeWeapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
-    inherit InvItem ()
-
-    override this.name = name
-
-    override this.icon = icon
-
-    override this.stats =
-       [ "Dmg.", dmg;
-          "Spell power", spellpower;
-          "Speed", speed]
-        |> Map.ofList
-
-
-
-
-
-
-type Wall () =
-    inherit Object ()
+    override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) = ()
 
     override this.FullyOccupy = true
 
-    member this.position = startPosition
-
     override this.RenderOn (canvas: Canvas) =
-         let x,y = this.position
+         let x,y = this.Position
          canvas.Set(x, y, "  ", Color.Black, Color.Black)
     
-    override this.Color = Color.Black
 
 
 
-type Water () =
-    inherit Object ()
+type Water (startPosition) =
+    inherit Item ()
+
+    override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) = creature.Heal 2
 
     override this.FullyOccupy = false
 
-    override this.Color = Color.Blue
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         canvas.Set(x, y, "  ", Color.Green, Color.Green)
 
 
-type Fire (startPosition: (int*int)) =
+
+type Fire (startPosition) =
     inherit Item ()
 
     let mutable interactions = 0
     let mutable isBurning = true
 
-    member this.position = startPosition
+    override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) =
         if isBurning then creature.Damage 1
@@ -504,25 +669,31 @@ type Fire (startPosition: (int*int)) =
 
     override this.FullyOccupy = false
 
-    override this.Color = Color.Red
 
     override this.RenderOn (canvas: Canvas) =
-         let x,y = this.position
+         let x,y = this.Position
          canvas.Set(x, y, "  ", Color.Red, Color.Red)
 
 
-type FleshEatingPlant () =
-    inherit Object ()
+type FleshEatingPlant (startPosition) =
+    inherit Item ()
+
+    override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) = creature.Damage 5
 
     override this.FullyOccupy = true
 
-    override this.Color = Color.DarkGreen
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         canvas.Set(x, y, "  ", Color.Green, Color.Green)
 
 
-type Exit () =
-    inherit Object ()
+
+type Exit (startPosition) =
+    inherit Item ()
+
+    override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) = 
         // Show end game notice
@@ -531,7 +702,10 @@ type Exit () =
 
     override this.FullyOccupy = false
 
-    override this.Color = Color.White
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         canvas.Set(x, y, "  ", Color.Green, Color.Green)
+
 
 
 
@@ -542,7 +716,7 @@ type Exit () =
 // MARK: World
 
 type World (canvas: Canvas, x:int, y:int) =
-    let mutable _world: (Entity option * Item) [,] = Array2D.create x y (None, (Grass () :> Item))
+    let mutable _world: (Entity option * Item) [,] = Array2D.init x y (fun i j -> (None, (Grass (j, i) :> Item)))
 
     member this.world = _world
 
@@ -553,7 +727,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (20,50,canvas)
+        let player = Player (20,50, Hunter (),canvas, this.world)
         let enemy = Enemy (0, 0, canvas, player, this.world)
 
         player.RenderOn canvas
@@ -564,11 +738,11 @@ type World (canvas: Canvas, x:int, y:int) =
         while not gameEnded do
 
             while System.Console.KeyAvailable = false do
-                enemy.Update (_world)
+                enemy.Update ()
                 canvas.Show (fst player.Position, snd player.Position)
                 System.Threading.Thread.Sleep(250)
 
-            player.Update (_world)
+            player.Update ()
 
             // if System.Console.KeyAvailable = true then
             //     player.Update (_world)
