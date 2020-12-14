@@ -281,11 +281,12 @@ type Mage () =
 
 
 
-type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
+type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direction,string>, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
     inherit Item ()
 
     let mutable _removed = false
     let mutable _position = startPosition
+    let mutable _icon = deficon
     override this.Position = _position
 
     override this.InteractWith (creature: Creature) = creature.Damage dmg
@@ -295,10 +296,9 @@ type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Can
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
          let _, fg, bg = canvas.Get (x,y)
-         canvas.Set(x, y, icon, fg, bg)
+         canvas.Set(x, y, _icon, fg, bg)
 
     member this.Remove () =
-        printfn "åhhhh"
         let x, y = _position
         let _, fg, bg = canvas.Get (x,y)
         canvas.Set(x, y, "  ", fg, bg)
@@ -315,10 +315,18 @@ type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Can
             let _, fg, bg = canvas.Get (oldX,oldY)
 
             match direction with
-            | Up when oldY > 0 -> newY <- oldY - 1
-            | Down when oldY < worldSizeY - 2 -> newY <- oldY + 1
-            | Left when oldX > 0 -> newX <- oldX - 1
-            | Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
+            | Up when oldY > 0 -> 
+                if (dirIcon.TryFind Up).IsSome then _icon <- (dirIcon.TryFind Up).Value
+                newY <- oldY - 1
+            | Down when oldY < worldSizeY - 2 ->
+                if (dirIcon.TryFind Down).IsSome then _icon <- (dirIcon.TryFind Down).Value
+                newY <- oldY + 1
+            | Left when oldX > 0 ->
+                if (dirIcon.TryFind Left).IsSome then _icon <- (dirIcon.TryFind Left).Value
+                newX <- oldX - 1
+            | Right when oldX < worldSizeX - 2 ->
+                if (dirIcon.TryFind Right).IsSome then _icon <- (dirIcon.TryFind Up).Value
+                newX <- oldX + 1
             | _ -> this.Remove ()
 
             let field = world.[newY,newX]
@@ -431,37 +439,27 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         let dy = enemyY - playerY
         let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
 
+        // Shoot in the direction with biggest difference in position
+        let mutable dir = Direction.Left
+        if (abs dx > abs dy) then
+            if (dx > 0) then
+                dir <- Direction.Right
+            else
+                dir <- Direction.Left
+        else
+            if (dy > 0) then
+                dir <- Direction.Down
+            else
+                dir <- Direction.Up
+
         match rpgClass with
         | :? Hunter ->
-            printfn "ATTACK"
+            let icon = [Direction.Up, "⬆️ "; Direction.Down, "⬇️ "; Direction.Left, "⬅️ "; Direction.Left, " ⏩"] |> Map.ofList
+            (Projectile ((playerX, playerY), "⏺ ",  icon, 2, canvas, world, dir)).Update ()
 
         | :? Warrior -> if dis < 2 then _target.Value.Damage 3
 
-        | :? Mage -> 
-            printfn "ATTACK"
-            // Shoot in the direction with biggest difference in position
-            let mutable dir = Direction.Left
-            if (abs dx > abs dy) then
-                if (dx > 0) then
-                    dir <- Direction.Right
-                else
-                    dir <- Direction.Left
-            else
-                if (dy > 0) then
-                    dir <- Direction.Down
-                else
-                    dir <- Direction.Up
-
-            (Projectile ((playerX, playerY), "🟠", 2, canvas, world, dir)).Update ()
-            // let mutable projX, projY = _position
-            // match dir with
-            // | Up when projY > 0 -> projY <- projY - 1
-            // | Down when projY < worldSizeY - 2 -> projY <- projY + 1
-            // | Left when projX > 0 -> projX <- projX - 1
-            // | Right when projX < worldSizeX - 2 -> projX <- projX + 1
-            // | _ -> ()
-
-            // if (fst world.[projY,projX])
+        | :? Mage -> (Projectile ((playerX, playerY), "🟠",  Map.empty, 2, canvas, world, dir)).Update ()
         
         | _ -> ()
         _attackTimer <- 5
@@ -791,7 +789,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (20,50, Mage (),canvas, this.world)
+        let player = Player (12,10, Hunter (),canvas, this.world)
         let enemy = Enemy (0, 0, canvas, player, this.world)
 
         player.RenderOn canvas
