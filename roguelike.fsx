@@ -28,6 +28,17 @@ type Canvas (rows: int, cols: int) =
     member this.Set (x: int, y: int, c: string, fg: Color, bg: Color) =
         _screen.[y,x] <- (c, bg, fg)
 
+    member this.ShowHUD (player: Creature, target: Creature option) =
+        printfn "Player:"
+        printfn "Health: %A" player.HitPoints
+
+        printfn "Target:"
+        if target.IsSome then
+            printfn "Health: %A" target.Value.HitPoints
+        else printfn "No target selected"
+        
+
+
     member this.ShowMenu () =
 
         System.Console.CursorVisible <- false
@@ -47,6 +58,7 @@ type Canvas (rows: int, cols: int) =
         System.Console.ResetColor()
     
     member this.Show (playerX, playerY) =
+        System.Console.Clear ()
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
 
@@ -81,9 +93,7 @@ type Canvas (rows: int, cols: int) =
 
 
 
-
-[<AbstractClass>]
-type Entity () =
+and [<AbstractClass>] Entity () =
     abstract member RenderOn: Canvas -> unit
     default this.RenderOn (canvas: Canvas) = ()
 
@@ -96,8 +106,8 @@ type Entity () =
     
 
 
-[<AbstractClass>]
-type Creature () =
+
+and [<AbstractClass>] Creature () =
     inherit Entity ()
 
     abstract member Position: (int * int) with get, set  
@@ -375,6 +385,8 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     let mutable _target: Enemy option = None
     let mutable _attackTimer = 0
 
+    member this.Target = _target
+
     override this.HitPoints
         with get () = _hitPoints
         and set (value) = _hitPoints <- value
@@ -454,7 +466,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
 
         match rpgClass with
         | :? Hunter ->
-            let icon = [Direction.Up, "⬆️ "; Direction.Down, "⬇️ "; Direction.Left, "⬅️ "; Direction.Left, " ⏩"] |> Map.ofList
+            let icon = [Direction.Up, "⬆️ "; Direction.Down, "⬇️ "; Direction.Left, "⬅️ "; Direction.Right, " ⏩"] |> Map.ofList
             (Projectile ((playerX, playerY), "⏺ ",  icon, 2, canvas, world, dir)).Update ()
 
         | :? Warrior -> if dis < 2 then _target.Value.Damage 3
@@ -507,6 +519,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     override this.Update () =
         this.HandleKeypress ()
         this.RenderOn (canvas)
+        
 
 
 
@@ -659,6 +672,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
             this.MoveTowardsPlayer ()
             this.Attack ()
             this.RenderOn canvas
+            
 
 
 
@@ -811,9 +825,13 @@ type World (canvas: Canvas, x:int, y:int) =
 
                 player.UpdateAttackCounter ()
                 canvas.Show (fst player.Position, snd player.Position)
+                if player.Target.IsSome then
+                    canvas.ShowHUD (player, Some (player.Target.Value :> Creature))
+                else canvas.ShowHUD (player, None)
                 System.Threading.Thread.Sleep(250)
 
             player.Update ()
+            
             
             
  
