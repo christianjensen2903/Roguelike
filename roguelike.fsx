@@ -19,7 +19,7 @@ let randomNumber (lower: int) (upper: int) =
 
 type Canvas (rows: int, cols: int) =
 
-    let mutable _screen = Array2D.create cols rows ("  ", Color.Green, Color.Green)
+    let mutable _screen = Array2D.create cols rows ("  ", Color.DarkGreen, Color.DarkGreen)
 
 
     member this.Get (x:int, y:int) =
@@ -281,7 +281,7 @@ type Mage () =
 
 
 
-type Projectile (startPosition: (int * int), direction: Direction, icon: string, dmg: int, canvas: Canvas, world: (Entity option * Item) [,]) =
+type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
     inherit Item ()
 
     let mutable _removed = false
@@ -292,46 +292,59 @@ type Projectile (startPosition: (int * int), direction: Direction, icon: string,
 
     override this.FullyOccupy = false
 
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         let _, fg, bg = canvas.Get (x,y)
+         canvas.Set(x, y, icon, fg, bg)
+
     member this.Remove () =
+        printfn "åhhhh"
         let x, y = _position
         let _, fg, bg = canvas.Get (x,y)
         canvas.Set(x, y, "  ", fg, bg)
         world.[y, x] <- (None, snd world.[y, x])
+        _removed <- true
 
-        
+           
 
     override this.Update () =
-        let oldX,oldY = _position
-        let mutable newX, newY = oldX, oldY
-        let _, fg, bg = canvas.Get (oldX,oldY)
-
-        match direction with
-        | Up when oldY > 0 -> newY <- oldY - 1
-        | Down when oldY < worldSizeY - 2 -> newY <- oldY + 1
-        | Left when oldX > 0 -> newX <- oldX - 1
-        | Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
-        | _ -> this.Remove ()
-
-        
-
-        let field = world.[newY,newX]
-        let item = snd field
-        
-        if not (fst field).IsSome && item.FullyOccupy = false then
-            canvas.Set(oldX, oldY, "  ", fg, bg)
-            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+        if not _removed then
             
-            _position <- (newX,newY)
+            printfn "Enter"
+            let oldX,oldY = _position
+            let mutable newX, newY = oldX, oldY
+            let _, fg, bg = canvas.Get (oldX,oldY)
+
+            match direction with
+            | Up when oldY > 0 -> newY <- oldY - 1
+            | Down when oldY < worldSizeY - 2 -> newY <- oldY + 1
+            | Left when oldX > 0 -> newX <- oldX - 1
+            | Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
+            | _ -> this.Remove ()
+
+            let field = world.[newY,newX]
+            let item = snd field
             
-        else if (fst field).IsSome then
-            match (fst field).Value with
-            | :? Creature -> this.InteractWith ((fst field).Value :?> Creature)
-            | _ -> ()
+            if not (fst field).IsSome && item.FullyOccupy = false then
+                printfn "1"
+                canvas.Set(oldX, oldY, "  ", fg, bg)
+                world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+                world.[newY,newX] <- (Some (this :> Entity), item)
+                _position <- (newX,newY)
+                if not _removed then this.RenderOn canvas
+                
+            else if (fst field).IsSome then
+                printfn "2"
+                match (fst field).Value with
+                | :? Creature -> this.InteractWith ((fst field).Value :?> Creature)
+                | _ -> ()
 
-            this.Remove ()
+                this.Remove ()
 
-        else
-            this.Remove ()
+            else
+                printfn "3"
+                this.Remove ()
+        else ()
             
 
 
@@ -405,18 +418,54 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
                     if enemy.IsSome then nearbyEnemies <- nearbyEnemies @ [enemy.Value]
 
         if List.length nearbyEnemies - 1 >= 0 then
-            printfn "%A %A %A" nearbyEnemies (List.length nearbyEnemies) (randomNumber 0 (List.length nearbyEnemies - 1))
-            nearbyEnemies.[randomNumber 0 (List.length nearbyEnemies - 1)].Target ()
+            let target = nearbyEnemies.[randomNumber 0 (List.length nearbyEnemies - 1)]
+            _target <- Some target
+            target.Target ()
         else ()
     
-    member this.Attack () = 
+    member this.Attack () =
+
+        // Get positions
+        let (enemyX, enemyY) = _target.Value.Position
+        let (playerX, playerY) = _position
+
+        // Calculate distance to player
+        let dx = enemyX - playerX
+        let dy = enemyY - playerY
+        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
+
         match rpgClass with
         | :? Hunter ->
             printfn "ATTACK"
-        | :? Warrior ->
-            printfn "ATTACK"
+
+        | :? Warrior -> if dis < 2 then _target.Value.Damage 3
+
         | :? Mage -> 
             printfn "ATTACK"
+            // Shoot in the direction with biggest difference in position
+            let mutable dir = Direction.Left
+            if (abs dx > abs dy) then
+                if (dx > 0) then
+                    dir <- Direction.Right
+                else
+                    dir <- Direction.Left
+            else
+                if (dy > 0) then
+                    dir <- Direction.Down
+                else
+                    dir <- Direction.Up
+
+            (Projectile ((playerX, playerY), "🟠", 2, canvas, world, dir)).Update ()
+            // let mutable projX, projY = _position
+            // match dir with
+            // | Up when projY > 0 -> projY <- projY - 1
+            // | Down when projY < worldSizeY - 2 -> projY <- projY + 1
+            // | Left when projX > 0 -> projX <- projX - 1
+            // | Right when projX < worldSizeX - 2 -> projX <- projX + 1
+            // | _ -> ()
+
+            // if (fst world.[projY,projX])
+        
         | _ -> ()
 
     override this.Icon = "😇"
@@ -444,12 +493,13 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     member this.HandleKeypress () =
         let mutable x, y = this.Position
         let key = System.Console.ReadKey()
-
+        
         match key.Key with
         | System.ConsoleKey.UpArrow when y > 0 -> y <- y - 1
         | System.ConsoleKey.DownArrow when y < worldSizeY - 1 -> y <- y + 1
         | System.ConsoleKey.LeftArrow when x > 0 -> x <- x - 1
         | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> x <- x + 1
+        | System.ConsoleKey.Spacebar when _target.IsSome -> this.Attack ()
         | System.ConsoleKey.Tab -> this.SwitchTarget ()
         | _ -> ()
 
@@ -479,6 +529,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
     let mutable _hitPoints = 10
     let mutable _isDead = false
     let mutable _isTarget = false
+    let mutable _spawnTimer = 0
 
 
     override this.HitPoints
@@ -495,7 +546,20 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
 
     override this.Damage (dmg: int) =
         _hitPoints <- _hitPoints - dmg
+
+        if _hitPoints <= 0 then
+            this.Die ()
     
+    member this.Die () =
+        printfn "Dead"
+        let x, y = _position
+        let item = snd world.[y,x]
+        item.RenderOn canvas
+        world.[y,x] <- (None, item)
+        _spawnTimer <- 100
+        _isDead <- true
+
+
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
 
@@ -513,6 +577,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
 
         if dis <= 1 then
+            printfn "Haps"
             player.Damage 5
     
     override this.Icon = "🧟‍♀️"
@@ -530,10 +595,8 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
     member this.MoveIn (direction: Direction) =
         
         let oldX,oldY = _position
-        printfn "1 %A %A" oldX oldY
         let mutable newX, newY = oldX, oldY
         let _, fg, bg = canvas.Get (oldX,oldY)
-        printfn "2 %A %A" oldX oldY
 
         match direction with
         | Direction.Up when oldY > 0 -> newY <- oldY - 1
@@ -579,14 +642,14 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
             let mutable dir = Direction.Left
 
             // Move in the direction with biggest difference in position
-            if (abs dx > abs dy) then
+            if (abs dx < abs dy) then
                 if (dx < 0) then
                     dir <- Direction.Right
                 else
                     dir <- Direction.Left
             
             else
-                if (dy < 0) then
+                if (dy > 0) then
                     dir <- Direction.Down
                 else
                     dir <- Direction.Up
@@ -594,9 +657,10 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
             this.MoveIn dir
 
     override this.Update () =
-        this.MoveTowardsPlayer ()
-        this.Attack ()
-        this.RenderOn canvas
+        if not _isDead then
+            this.MoveTowardsPlayer ()
+            this.Attack ()
+            this.RenderOn canvas
 
 
 
@@ -617,7 +681,7 @@ type Grass (startPosition) =
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
-         canvas.Set(x, y, "  ", Color.Green, Color.Green)
+         canvas.Set(x, y, "  ", Color.DarkGreen, Color.DarkGreen)
 
 
 
@@ -727,7 +791,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (20,50, Hunter (),canvas, this.world)
+        let player = Player (20,50, Mage (),canvas, this.world)
         let enemy = Enemy (0, 0, canvas, player, this.world)
 
         player.RenderOn canvas
@@ -738,7 +802,17 @@ type World (canvas: Canvas, x:int, y:int) =
         while not gameEnded do
 
             while System.Console.KeyAvailable = false do
-                enemy.Update ()
+                let tempWorld = Array2D.copy _world
+                for y = 0 to Array2D.length1 tempWorld - 1 do
+                    for x = 0 to Array2D.length2 tempWorld - 1 do
+                        let object = fst tempWorld.[y,x]
+                        if object.IsSome then
+                            if object.Value <> (player :> Entity) then
+                                object.Value.Update ()
+
+
+
+                // enemy.Update ()
                 canvas.Show (fst player.Position, snd player.Position)
                 System.Threading.Thread.Sleep(250)
 
