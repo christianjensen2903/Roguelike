@@ -544,8 +544,11 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
     let world = world
     let canvas = canvas
     let player = player
-    let mutable _position = (x,y)
-    let mutable _hitPoints = 10
+    let mutable _spawnPoint = (x,y)
+    let mutable _movingToSpawn = false
+    let mutable _position = _spawnPoint
+    let mutable _maxHealth = 10
+    let mutable _hitPoints = _maxHealth
     let mutable _isDead = false
     let mutable _isTarget = false
     let mutable _spawnTimer = 0
@@ -575,7 +578,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         let item = snd world.[y,x]
         item.RenderOn canvas
         world.[y,x] <- (None, item)
-        _spawnTimer <- 100
+        _spawnTimer <- 10
         _isDead <- true
 
 
@@ -610,6 +613,18 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
          else
             canvas.Set(x, y, this.Icon, fg, bg)
 
+    member this.Spawn () =
+        if _spawnTimer <= 0 then
+            _position <- _spawnPoint
+            let x, y = _position
+            let item = snd world.[y,x]
+            item.RenderOn canvas
+            world.[y,x] <- (Some (this :> Entity), item)
+            _isDead <- false
+
+        else 
+            _spawnTimer <- _spawnTimer - 1
+
     member this.MoveIn (direction: Direction) =
         
         let oldX,oldY = _position
@@ -637,6 +652,42 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         else
             ()
 
+    member this.MoveToSpawn() =
+        // Get positions
+        let (enemyX, enemyY) = _position
+        let (spawnX, spawnY) = _spawnPoint
+
+        // Calculate distance to player
+        let dx = enemyX - spawnX
+        let dy = enemyY - spawnY
+        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
+
+        let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
+        if dis < 3 then _movingToSpawn <- false
+
+        if (dis > 30 || _movingToSpawn) then  
+            // Enemy is too far from spawn point move back
+            let mutable dir = Direction.Left
+            if _hitPoints < _maxHealth then this.Heal 2
+            _movingToSpawn <- true
+
+            // Move in the direction with biggest difference in position
+            if (abs dx > abs dy) then
+                if (dx < 0) then
+                    dir <- Direction.Right
+                else
+                    dir <- Direction.Left
+            
+            else
+                if (dy < 0) then
+                    dir <- Direction.Down
+                else
+                    dir <- Direction.Up
+            
+            this.MoveIn dir
+            
+
+            
 
     member this.MoveTowardsPlayer () =
         // Get positions
@@ -650,13 +701,17 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
 
         let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
 
+        // Check if it should move to spawn
+        this.MoveToSpawn ()
+
+        // else move
         if (dis > 10) then  
             // If player are to far away move random direction
             let dirInd = randomNumber 0 (List.length directions)
             let dir = directions.[dirInd]
             this.MoveIn dir
         
-        else
+        else if (_movingToSpawn = false) then
             let mutable dir = Direction.Left
 
             // Move in the direction with biggest difference in position
@@ -679,7 +734,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
             this.MoveTowardsPlayer ()
             this.Attack ()
             this.RenderOn canvas
-            
+        else this.Spawn ()
 
 
 
@@ -801,6 +856,7 @@ type Exit (startPosition) =
 type World (canvas: Canvas, x:int, y:int) =
     let mutable _world: (Entity option * Item) [,] = Array2D.init x y (fun i j -> (None, (Grass (j, i) :> Item)))
     let mutable _gameState: GameState = GameState.Playing
+    let mutable _enemies: Enemy list = []
 
     member this.world = _world
 
@@ -816,10 +872,17 @@ type World (canvas: Canvas, x:int, y:int) =
         | GameOver -> ()
 
 
+
+    member this.DeadEnemiesKeeper () =
+
+        let deadEnemies = List.filter (fun (x: Enemy) -> x.IsDead) _enemies
+        for i in deadEnemies do i.Update()
+
     member this.Play () =
 
         let player = Player (12,10, Hunter (),canvas, this.world)
         let enemy = Enemy (0, 0, canvas, player, this.world)
+        _enemies <- _enemies @ [enemy]
 
         player.RenderOn canvas
         enemy.RenderOn canvas
@@ -837,6 +900,7 @@ type World (canvas: Canvas, x:int, y:int) =
                                 object.Value.Update ()
 
 
+                this.DeadEnemiesKeeper ()
                 player.UpdateAttackCounter ()
                 canvas.Show (fst player.Position, snd player.Position)
                 if player.Target.IsSome then
