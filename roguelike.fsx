@@ -213,6 +213,7 @@ let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
 
 
+type GameState = Playing | Paused | GameOver | Starting
 
 
 type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
@@ -401,6 +402,12 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
 
     override this.Damage (dmg: int) =
         _hitPoints <- _hitPoints - dmg
+
+        if _hitPoints <= 0 then
+            this.Die ()
+    
+    member this.Die () =
+        _isDead <- true
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
@@ -589,7 +596,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
 
         if dis <= 1 then
-            player.Damage 5
+            player.Damage 1
     
     override this.Icon = "🧟‍♀️"
 
@@ -793,12 +800,20 @@ type Exit (startPosition) =
 
 type World (canvas: Canvas, x:int, y:int) =
     let mutable _world: (Entity option * Item) [,] = Array2D.init x y (fun i j -> (None, (Grass (j, i) :> Item)))
+    let mutable _gameState: GameState = GameState.Playing
 
     member this.world = _world
 
     member this.AddItem (item: Item, x:int, y:int) =
          _world.[y,x] <- (fst _world.[y,x], item)
          item.RenderOn canvas
+
+    member this.StateKeeper () =
+        match _gameState with
+        | Playing -> this.Play()
+        | Paused -> ()
+        | Starting -> ()
+        | GameOver -> ()
 
 
     member this.Play () =
@@ -810,8 +825,7 @@ type World (canvas: Canvas, x:int, y:int) =
         enemy.RenderOn canvas
         canvas.Show (fst player.Position, snd player.Position)
 
-        let mutable gameEnded = false
-        while not gameEnded do
+        while _gameState = GameState.Playing do
 
             while System.Console.KeyAvailable = false do
                 let tempWorld = Array2D.copy _world
@@ -828,6 +842,7 @@ type World (canvas: Canvas, x:int, y:int) =
                 if player.Target.IsSome then
                     canvas.ShowHUD (player, Some (player.Target.Value :> Creature))
                 else canvas.ShowHUD (player, None)
+                if player.IsDead then _gameState <- GameOver
                 System.Threading.Thread.Sleep(250)
 
             player.Update ()
