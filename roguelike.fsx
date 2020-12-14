@@ -310,7 +310,6 @@ type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Can
     override this.Update () =
         if not _removed then
             
-            printfn "Enter"
             let oldX,oldY = _position
             let mutable newX, newY = oldX, oldY
             let _, fg, bg = canvas.Get (oldX,oldY)
@@ -326,7 +325,6 @@ type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Can
             let item = snd field
             
             if not (fst field).IsSome && item.FullyOccupy = false then
-                printfn "1"
                 canvas.Set(oldX, oldY, "  ", fg, bg)
                 world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
                 world.[newY,newX] <- (Some (this :> Entity), item)
@@ -334,7 +332,6 @@ type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Can
                 if not _removed then this.RenderOn canvas
                 
             else if (fst field).IsSome then
-                printfn "2"
                 match (fst field).Value with
                 | :? Creature -> this.InteractWith ((fst field).Value :?> Creature)
                 | _ -> ()
@@ -342,7 +339,6 @@ type Projectile (startPosition: (int * int), icon: string, dmg: int, canvas: Can
                 this.Remove ()
 
             else
-                printfn "3"
                 this.Remove ()
         else ()
             
@@ -369,6 +365,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     let mutable _hitPoints = 10
     let mutable _isDead = false
     let mutable _target: Enemy option = None
+    let mutable _attackTimer = 0
 
     override this.HitPoints
         with get () = _hitPoints
@@ -467,8 +464,12 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
             // if (fst world.[projY,projX])
         
         | _ -> ()
+        _attackTimer <- 5
 
     override this.Icon = "😇"
+
+    member this.UpdateAttackCounter () =
+        if _attackTimer > 0 then _attackTimer <- _attackTimer - 1
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
@@ -499,7 +500,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         | System.ConsoleKey.DownArrow when y < worldSizeY - 1 -> y <- y + 1
         | System.ConsoleKey.LeftArrow when x > 0 -> x <- x - 1
         | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> x <- x + 1
-        | System.ConsoleKey.Spacebar when _target.IsSome -> this.Attack ()
+        | System.ConsoleKey.Spacebar when _target.IsSome -> if _attackTimer = 0 then this.Attack ()
         | System.ConsoleKey.Tab -> this.SwitchTarget ()
         | _ -> ()
 
@@ -813,6 +814,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
 
                 // enemy.Update ()
+                player.UpdateAttackCounter ()
                 canvas.Show (fst player.Position, snd player.Position)
                 System.Threading.Thread.Sleep(250)
 
