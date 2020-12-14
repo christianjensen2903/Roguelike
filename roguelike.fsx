@@ -578,7 +578,6 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
 
         if dis <= 1 then
-            printfn "Haps"
             player.Damage 5
     
     override this.Icon = "🧟‍♀️"
@@ -643,14 +642,14 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
             let mutable dir = Direction.Left
 
             // Move in the direction with biggest difference in position
-            if (abs dx < abs dy) then
+            if (abs dx > abs dy) then
                 if (dx < 0) then
                     dir <- Direction.Right
                 else
                     dir <- Direction.Left
             
             else
-                if (dy > 0) then
+                if (dy < 0) then
                     dir <- Direction.Down
                 else
                     dir <- Direction.Up
@@ -812,20 +811,11 @@ type World (canvas: Canvas, x:int, y:int) =
                                 object.Value.Update ()
 
 
-
-                // enemy.Update ()
                 player.UpdateAttackCounter ()
                 canvas.Show (fst player.Position, snd player.Position)
                 System.Threading.Thread.Sleep(250)
 
             player.Update ()
-
-            // if System.Console.KeyAvailable = true then
-            //     player.Update (_world)
-
-            // enemy.Update (_world)
-            // canvas.Show (fst player.Position, snd player.Position)
-            // System.Threading.Thread.Sleep(250)
             
             
  
