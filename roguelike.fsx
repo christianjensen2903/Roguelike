@@ -15,6 +15,42 @@ let randomNumber (lower: int) (upper: int) =
     random.Next(lower, upper)
 
 
+let getDistance (pos1: int*int) (pos2: int*int) =
+    // Get positions
+    let (x1, y1) = pos1
+    let (x2, y2) = pos2
+
+    // Calculate distance to player
+    let dx = x1 - x2
+    let dy = y1 - y2
+    int (sqrt (float(dx)**2. + float(dy)**2.))
+
+let getDirection (pos1: int*int) (pos2: int*int) =
+    // Get positions
+    let (x1, y1) = pos1
+    let (x2, y2) = pos2
+
+    let dx = x1 - x2
+    let dy = y1 - y2
+    
+    // Shoot in the direction with biggest difference in position
+    if (abs dx > abs dy) then
+        if (dx > 0) then
+            Direction.Right
+        else
+            Direction.Left
+    else
+        if (dy > 0) then
+            Direction.Down
+        else
+            Direction.Up
+
+
+
+
+
+
+
 // MARK: Canvas
 
 type Canvas (rows: int, cols: int) =
@@ -489,16 +525,17 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
             if object.IsSome then
                 match object.Value with
                 | :? Enemy ->
+                    
                     // Get positions
                     let enemy = object.Value :?> Enemy
-                    let (enemyX, enemyY) = enemy.Position
-                    let (playerX, playerY) = _position
+                    // let (enemyX, enemyY) = enemy.Position
+                    // let (playerX, playerY) = _position
 
-                    // Calculate distance to player
-                    let dx = enemyX - playerX
-                    let dy = enemyY - playerY
-                    let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
-                    if dis < 20 then Some enemy else None
+                    // // Calculate distance to player
+                    // let dx = enemyX - playerX
+                    // let dy = enemyY - playerY
+                    // let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
+                    if getDistance enemy.Position _position < 20 then Some enemy else None
 
                 | _ -> None
             else None
@@ -517,36 +554,17 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     
     override this.Attack () =
 
-        // Get positions
-        let (enemyX, enemyY) = _target.Value.Position
-        let (playerX, playerY) = _position
-
-        // Calculate distance to player
-        let dx = enemyX - playerX
-        let dy = enemyY - playerY
-        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
-
-        // Shoot in the direction with biggest difference in position
-        let mutable dir = Direction.Left
-        if (abs dx > abs dy) then
-            if (dx > 0) then
-                dir <- Direction.Right
-            else
-                dir <- Direction.Left
-        else
-            if (dy > 0) then
-                dir <- Direction.Down
-            else
-                dir <- Direction.Up
+        let dis = getDistance _target.Value.Position _position
+        let dir = getDirection _target.Value.Position _position
 
         match rpgClass with
         | :? Hunter ->
             let icon = [Direction.Up, "⬆️ "; Direction.Down, "⬇️ "; Direction.Left, "⬅️ "; Direction.Right, " ⏩"] |> Map.ofList
-            (Projectile ((playerX, playerY), "⏺ ",  icon, 2, canvas, world, dir)).Update ()
+            (Projectile ((fst _position, snd _position), "⏺ ",  icon, 2, canvas, world, dir)).Update ()
 
         | :? Warrior -> if dis < 2 then _target.Value.Damage 3
 
-        | :? Mage -> (Projectile ((playerX, playerY), "🟠",  Map.empty, 2, canvas, world, dir)).Update ()
+        | :? Mage -> (Projectile ((fst _position, snd _position), "🟠",  Map.empty, 2, canvas, world, dir)).Update ()
         
         | _ -> ()
         _attackTimer <- 5
@@ -664,18 +682,8 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
     member this.Target () = _isTarget <- true
     member this.RemoveTarget () = _isTarget <- false
 
-    override this.Attack () =
-        // Get positions
-        let (enemyX, enemyY) = _position
-        let (playerX, playerY) = player.Position
+    override this.Attack () = if getDistance _position player.Position <= 1 then player.Damage 1  
 
-        // Calculate distance to player
-        let dx = enemyX - playerX
-        let dy = enemyY - playerY
-        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
-
-        if dis <= 1 then
-            player.Damage 1
     
     override this.Icon = "🧟‍♀️"
 
@@ -729,52 +737,20 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
             ()
 
     member this.MoveToSpawn() =
-        // Get positions
-        let (enemyX, enemyY) = _position
-        let (spawnX, spawnY) = _spawnPoint
+        let dis = getDistance _spawnPoint _position
+        printfn "%A" dis
 
-        // Calculate distance to player
-        let dx = enemyX - spawnX
-        let dy = enemyY - spawnY
-        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
-
-        let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
         if dis < 3 then _movingToSpawn <- false
 
-        if (dis > 30 || _movingToSpawn) then  
-            // Enemy is too far from spawn point move back
-            let mutable dir = Direction.Left
-            if _hitPoints < _maxHealth then this.Heal 2
+        if (dis > 30 || _movingToSpawn) then
             _movingToSpawn <- true
-
-            // Move in the direction with biggest difference in position
-            if (abs dx > abs dy) then
-                if (dx < 0) then
-                    dir <- Direction.Right
-                else
-                    dir <- Direction.Left
-            
-            else
-                if (dy < 0) then
-                    dir <- Direction.Down
-                else
-                    dir <- Direction.Up
-            
-            this.MoveIn dir
+            this.MoveIn (getDirection _spawnPoint _position)
             
 
             
 
     member this.MoveTowardsPlayer () =
-        // Get positions
-        let (enemyX, enemyY) = _position
-        let (playerX, playerY) = player.Position
-
-        // Calculate distance to player
-        let dx = enemyX - playerX
-        let dy = enemyY - playerY
-        let dis = int (sqrt (float(dx)**2. + float(dy)**2.))
-
+        let dis = getDistance player.Position _position
         let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
 
         // Check if it should move to spawn
@@ -784,26 +760,10 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         if (dis > 10) then  
             // If player are to far away move random direction
             let dirInd = randomNumber 0 (List.length directions)
-            let dir = directions.[dirInd]
-            this.MoveIn dir
+            this.MoveIn directions.[dirInd]
         
         else if (_movingToSpawn = false) then
-            let mutable dir = Direction.Left
-
-            // Move in the direction with biggest difference in position
-            if (abs dx > abs dy) then
-                if (dx < 0) then
-                    dir <- Direction.Right
-                else
-                    dir <- Direction.Left
-            
-            else
-                if (dy < 0) then
-                    dir <- Direction.Down
-                else
-                    dir <- Direction.Up
-            
-            this.MoveIn dir
+            this.MoveIn (getDirection player.Position _position)
 
     override this.Update () =
         if not _isDead then
