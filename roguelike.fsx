@@ -31,16 +31,6 @@ type Canvas (rows: int, cols: int) =
 
     member this.SetHUD (text: string) = _HUD <- text
 
-    member this.ShowHUD (player: Creature, target: Creature option) =
-        printfn "Player:"
-        printfn "Health: %A" player.HitPoints
-        printfn "Spells"
-
-        printfn "Target:"
-        if target.IsSome then
-            printfn "Health: %A" target.Value.HitPoints
-        else printfn "No target selected"
-        
 
 
     member this.ShowMenu () =
@@ -62,7 +52,7 @@ type Canvas (rows: int, cols: int) =
         System.Console.ResetColor()
     
     member this.Show (playerX, playerY) =
-        System.Console.Clear ()
+        // System.Console.Clear ()
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
 
@@ -961,14 +951,14 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.SetHUD (player: Player) =
         let text = [
-            "Player:";
-            sprintf "HP: %A" player.HitPoints;
-            "Spells:";
-            sprintf "1 - %s: %A" player.RpgClass.spells.[0].name player.RpgClass.spells.[0].coolDownTimer;
-            sprintf "2 - %s: %A" player.RpgClass.spells.[1].name player.RpgClass.spells.[1].coolDownTimer;
-            sprintf "3 - %s: %A" player.RpgClass.spells.[2].name player.RpgClass.spells.[2].coolDownTimer;
-            "Target:";
-            sprintf "%s" (if player.Target.IsSome then sprintf "HP: %A" player.Target.Value.HitPoints else "No enemy targeted")] |> String.concat "\n"
+            "Player:                                     ";
+            sprintf "HP: %A                              " player.HitPoints;
+            "Spells:                                     ";
+            sprintf "1 - %s: %A                          " player.RpgClass.spells.[0].name player.RpgClass.spells.[0].coolDownTimer;
+            sprintf "2 - %s: %A                          " player.RpgClass.spells.[1].name player.RpgClass.spells.[1].coolDownTimer;
+            sprintf "3 - %s: %A                          " player.RpgClass.spells.[2].name player.RpgClass.spells.[2].coolDownTimer;
+            "Target:                                     ";
+            sprintf "%s                                  " (if player.Target.IsSome then sprintf "HP: %A" player.Target.Value.HitPoints else "No enemy targeted")] |> String.concat "\n"
             // "test"
             
             // 
