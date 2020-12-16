@@ -20,6 +20,7 @@ let randomNumber (lower: int) (upper: int) =
 type Canvas (rows: int, cols: int) =
 
     let mutable _screen = Array2D.create cols rows ("  ", Color.DarkGreen, Color.DarkGreen)
+    let mutable _HUD: string = ""
 
 
     member this.Get (x:int, y:int) =
@@ -28,9 +29,12 @@ type Canvas (rows: int, cols: int) =
     member this.Set (x: int, y: int, c: string, fg: Color, bg: Color) =
         _screen.[y,x] <- (c, bg, fg)
 
+    member this.SetHUD (text: string) = _HUD <- text
+
     member this.ShowHUD (player: Creature, target: Creature option) =
         printfn "Player:"
         printfn "Health: %A" player.HitPoints
+        printfn "Spells"
 
         printfn "Target:"
         if target.IsSome then
@@ -87,6 +91,8 @@ type Canvas (rows: int, cols: int) =
             System.Console.Write("\n")
         System.Console.ResetColor()
 
+        printfn "%s" _HUD
+
 
 
 
@@ -117,6 +123,8 @@ and [<AbstractClass>] Creature () =
     abstract member IsDead: bool with get, set
 
     abstract member Damage: int -> unit
+
+    abstract member Attack: unit -> unit
     
     abstract member Heal: int -> unit
 
@@ -136,36 +144,96 @@ and [<AbstractClass>] Item () =
 
 
 
-
-
 [<AbstractClass>]
 type Spell () =
+    abstract member name: string
     abstract member baseDmg: int
+    abstract member coolDown: int
+    abstract member coolDownTimer: int
+
+    abstract member Cast: Creature * Creature option -> unit
+    default this.Cast (player: Creature, target: Creature option) = ()
+
+    abstract member UpdateTimer: unit -> unit
+    default this.UpdateTimer () = ()
 
 
-type MultiShot () =
+
+type RapidFire () =
     inherit Spell ()
+    let mutable _castCount = 0
+    let mutable _coolDownTimer = 0
+
+    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
+    override this.coolDown = 15
+    override this.name = "Rapid Fire"
+
+
+    override this.Cast (player: Creature, target: Creature option) = 
+        if target.IsSome && _coolDownTimer = 0 then
+            player.Attack ()
+            if _castCount = 2 then
+                _coolDownTimer <- this.coolDown
+                _castCount <- 0
+            else 
+                _castCount <- _castCount + 1
+    
+    override this.UpdateTimer () =
+        if _coolDownTimer > 0 then _coolDownTimer <- _coolDownTimer - 1
+
+
+        
+    
 
 type FreezingShot () =
     inherit Spell ()
+    let mutable _coolDownTimer = 0
+
+    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
+    override this.coolDown = 15
+    override this.name = "Freezing Shot"
 
 type Poisonshot () =
     inherit Spell ()
+    let mutable _coolDownTimer = 0
+
+    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
+    override this.coolDown = 15
+    override this.name = "Poison Shot"
 
 type Fireblast () =
     inherit Spell ()
+    let mutable _coolDownTimer = 0
+
+    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
+    override this.coolDown = 15
+    override this.name = "Fireblast"
 
 type Freezenova () =
     inherit Spell ()
+    let mutable _coolDownTimer = 0
+
+    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
+    override this.coolDown = 15
+    override this.name = "Freeze nova"
 
 type Lightningbolt () =
     inherit Spell ()
+    let mutable _coolDownTimer = 0
+
+    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
+    override this.coolDown = 15
+    override this.name = "Lightning bolt"
+
+
+
+
 
 
 
@@ -229,13 +297,17 @@ type RpgClass () =
 
 type Hunter () =
     inherit RpgClass ()
+    
 
-    override this.startingWeapon = basicBow
-
-    override this.spells =
-        [MultiShot ();
+    let _spells: Spell list = 
+        [RapidFire ();
         FreezingShot ();
         Poisonshot ()]
+    
+
+    override this.spells = _spells
+
+    override this.startingWeapon = basicBow
 
     override this.statMultipliers =
         [Stat.Damage, 2;
@@ -254,7 +326,7 @@ type Warrior () =
     override this.startingWeapon = basicSword
 
     override this.spells =
-        [MultiShot ();
+        [RapidFire ();
         FreezingShot ();
         Poisonshot ()]
 
@@ -375,6 +447,9 @@ type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direc
 
 
 
+
+
+
 // MARK: Player
 
 type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity option * Item) [,]) =
@@ -406,11 +481,14 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         if _hitPoints <= 0 then
             this.Die ()
     
+    member this.RpgClass = rpgClass
+    
     member this.Die () =
         _isDead <- true
     
     override this.Heal (h: int) =
         _hitPoints <- _hitPoints + h
+
 
 
     member this.SwitchTarget () =
@@ -447,7 +525,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
             target.Target ()
         else ()
     
-    member this.Attack () =
+    override this.Attack () =
 
         // Get positions
         let (enemyX, enemyY) = _target.Value.Position
@@ -485,6 +563,9 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
 
     override this.Icon = "😇"
 
+    member this.UpdateSpellTimers () =
+        List.iter (fun (elm: Spell) -> elm.UpdateTimer ()) rpgClass.spells
+
     member this.UpdateAttackCounter () =
         if _attackTimer > 0 then _attackTimer <- _attackTimer - 1
 
@@ -519,9 +600,14 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> x <- x + 1
         | System.ConsoleKey.Spacebar when _target.IsSome -> if _attackTimer = 0 then this.Attack ()
         | System.ConsoleKey.Tab -> this.SwitchTarget ()
+        | System.ConsoleKey.D1 when _target.IsSome -> rpgClass.spells.[0].Cast (this :> Creature, Some (_target.Value :> Creature))
         | _ -> ()
 
         this.MoveTo (x, y)
+
+    member this.UpdateCounters () =
+        this.UpdateAttackCounter ()
+        this.UpdateSpellTimers ()
 
     override this.Update () =
         this.HandleKeypress ()
@@ -588,7 +674,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
     member this.Target () = _isTarget <- true
     member this.RemoveTarget () = _isTarget <- false
 
-    member this.Attack () =
+    override this.Attack () =
         // Get positions
         let (enemyX, enemyY) = _position
         let (playerX, playerY) = player.Position
@@ -858,6 +944,8 @@ type World (canvas: Canvas, x:int, y:int) =
     let mutable _gameState: GameState = GameState.Playing
     let mutable _enemies: Enemy list = []
 
+    
+
     member this.world = _world
 
     member this.AddItem (item: Item, x:int, y:int) =
@@ -871,7 +959,26 @@ type World (canvas: Canvas, x:int, y:int) =
         | Starting -> ()
         | GameOver -> ()
 
+    member this.SetHUD (player: Player) =
+        let text = [
+            "Player:";
+            sprintf "HP: %A" player.HitPoints;
+            "Spells:";
+            sprintf "1 - %s: %A" player.RpgClass.spells.[0].name player.RpgClass.spells.[0].coolDownTimer;
+            sprintf "2 - %s: %A" player.RpgClass.spells.[1].name player.RpgClass.spells.[1].coolDownTimer;
+            sprintf "3 - %s: %A" player.RpgClass.spells.[2].name player.RpgClass.spells.[2].coolDownTimer;
+            "Target:";
+            sprintf "%s" (if player.Target.IsSome then sprintf "HP: %A" player.Target.Value.HitPoints else "No enemy targeted")] |> String.concat "\n"
+            // "test"
+            
+            // 
+        //     player.HitPoints
+        //     player.RpgClass.spells.[0].name player.RpgClass.spells.[0].coolDownTimer
+        //     player.RpgClass.spells.[1].name player.RpgClass.spells.[1].coolDownTimer
+        //     player.RpgClass.spells.[2].name player.RpgClass.spells.[2].coolDownTimer
+            
 
+        canvas.SetHUD text
 
     member this.DeadEnemiesKeeper () =
 
@@ -901,12 +1008,14 @@ type World (canvas: Canvas, x:int, y:int) =
 
 
                 this.DeadEnemiesKeeper ()
-                player.UpdateAttackCounter ()
+                player.UpdateCounters ()
+
                 canvas.Show (fst player.Position, snd player.Position)
-                if player.Target.IsSome then
-                    canvas.ShowHUD (player, Some (player.Target.Value :> Creature))
-                else canvas.ShowHUD (player, None)
+                // if player.Target.IsSome then
+                //     canvas.ShowHUD (player, Some (player.Target.Value :> Creature))
+                // else canvas.ShowHUD (player, None)
                 if player.IsDead then _gameState <- GameOver
+                this.SetHUD player
                 System.Threading.Thread.Sleep(250)
 
             player.Update ()
