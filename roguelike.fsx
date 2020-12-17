@@ -4,6 +4,8 @@
 type Color = System.ConsoleColor
 type Direction = Left | Right | Down | Up
 type Effect = Frozen | Poisoned
+type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
+type GameState = Playing | Paused | GameOver | Starting
 
 let worldSizeX = 100
 let worldSizeY = 200
@@ -127,8 +129,6 @@ type Canvas (rows: int, cols: int) =
 
 
 and [<AbstractClass>] Entity () =
-
-    let mutable _entities: Entity list = []
     abstract member RenderOn: Canvas -> unit
     default this.RenderOn (canvas: Canvas) = ()
 
@@ -138,99 +138,29 @@ and [<AbstractClass>] Entity () =
     abstract member Icon: string
     default this.Icon = "  "
 
-    member __.AddEntity entity = _entities <- entity :: _entities
-
-    member __.AddEntitiesTo canvas = List.iter (fun (e: Entity) -> e.RenderOn canvas) _entities 
-
     
 
 
 
-and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity option * Item) [,]) =
+and [<AbstractClass>] Creature () =
     inherit Entity ()
 
-    let mutable _position = (x,y)
-    let mutable _maxHealth = 10
-    let mutable _hitPoints = _maxHealth
-    let mutable _isDead = false
-    let mutable _target: Creature option = None
-    let mutable _attackTimer = 0
-    let mutable _effect: Effect option = None
-    let mutable _effectTimer: int = 0
-    let mutable _icon: string = ""
+    abstract member Position: (int * int) with get, set  
 
-    member __.Position
-        with get () = _position
-        and set (value) = _position <- value
+    abstract member HitPoints: int with get, set
 
-    member __.Icon
-        with get () = _icon
-        and set (value) = _icon <- value
+    abstract member Effect: Effect option with get, set
 
-    member __.AttackTimer
-        with get () = _attackTimer
-        and set (value) = _attackTimer <- value
-
-    member __.EffectTimer
-        with get () = _effectTimer
-        and set (value) = _effectTimer <- value
-    
-    member __.Effect
-        with get () = _effect
-        and set (value) = _effect <- value
-
-    member __.HitPoints
-        with get () = _hitPoints
-        and set (value) = _hitPoints <- value
-
-    member __.IsDead
-        with get () = _isDead
-        and set (value) = _isDead <- value
-
-    member __.Damage (dmg: int) =
-        _hitPoints <- _hitPoints - dmg
-
-        if _hitPoints <= 0 then
-            __.Die ()
-
-    
-    member __.Heal (h: int) =
-        _hitPoints <- _hitPoints + h       
-    
-
-    member __.UpdateEffect () =
-        if _effectTimer > 0 then 
-            _effectTimer <- _effectTimer - 1
-        else if _effectTimer = 0 then _effect <- None
-
-    member __.UpdateAttackCounter () =
-        if _attackTimer > 0 then _attackTimer <- _attackTimer - 1
+    abstract member EffectTimer: int with get, set
 
 
-    override __.RenderOn (canvas: Canvas) =
-         let x,y = __.Position
-         let _, fg, bg = canvas.Get (x,y)
-         canvas.Set(x, y, _icon, fg, bg)
+    abstract member IsDead: bool with get, set
 
-    member this.MoveTo (x: int, y: int) =
-        let oldX,oldY = this.Position
-        let _, fg, bg = canvas.Get (oldX,oldY)
-        let field = world.[y,x]
-        let item = snd field
-        if not (fst field).IsSome && item.FullyOccupy = false then
-            canvas.Set(oldX, oldY, "  ", fg, bg)
-            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
-            world.[y,x] <- (Some (this :> Entity), item)
-            this.Position <- (x,y)
-            item.InteractWith this
-        else
-            ()
-
+    abstract member Damage: int -> unit
 
     abstract member Attack: unit -> unit
-
-    abstract member Die: unit -> unit
     
+    abstract member Heal: int -> unit
 
 
 and [<AbstractClass>] Item () =
@@ -250,7 +180,7 @@ and [<AbstractClass>] Item () =
 
 
 
-type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direction,string>, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
+and Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direction,string>, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
     inherit Item ()
 
     let mutable _removed = false
@@ -335,59 +265,58 @@ type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direc
 
 
 
-[<AbstractClass>]
-type Spell () =
+
+and [<AbstractClass>] Spell () =
     abstract member name: string
     abstract member baseDmg: int
     abstract member coolDown: int
-    abstract member coolDownTimer: int
-
-    abstract member Cast: Creature * Creature option * Canvas * (Entity option * Item) [,] -> unit
-    default this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) = ()
-
-    abstract member UpdateTimer: unit -> unit
-    default this.UpdateTimer () = ()
-
-
-
-type RapidFire () =
-    inherit Spell ()
-    let mutable _castCount = 0
     let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
+    member __.CoolDownTimer
+        with get () = _coolDownTimer
+        and set (value) = _coolDownTimer <- value
+
+    abstract member Cast: Player * Enemy option * Canvas * (Entity option * Item) [,] -> unit
+    default this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) = ()
+
+    member __.UpdateTimer () =
+        if this.CoolDownTimer > 0 then this.CoolDownTimer <- this.CoolDownTimer - 1
+
+
+
+and RapidFire () =
+    inherit Spell ()
+    let mutable _castCount = 0
+
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Rapid Fire"
 
 
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) = 
-        if target.IsSome && _coolDownTimer = 0 then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) = 
+        if target.IsSome && this.CoolDownTimer = 0 then
             player.Attack ()
             if _castCount = 2 then
-                _coolDownTimer <- this.coolDown
+                this.CoolDownTimer <- this.coolDown
                 _castCount <- 0
             else 
                 _castCount <- _castCount + 1
     
-    override this.UpdateTimer () =
-        if _coolDownTimer > 0 then _coolDownTimer <- _coolDownTimer - 1
 
 
         
     
 
-type FreezingShot () =
+and FreezingShot () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Freezing Shot"
 
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) =
-        if target.IsSome then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
             let dis = getDistance target.Value.Position player.Position
             let dir = getDirection target.Value.Position player.Position
             let projectile = (Projectile ((fst player.Position, snd player.Position), "🔷",  Map.empty, 2, canvas, world, dir))
@@ -395,52 +324,45 @@ type FreezingShot () =
             projectile.Update ()
 
 
-type Poisonshot () =
+and Poisonshot () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Poison Shot"
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) =
-        if target.IsSome then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
             let dis = getDistance target.Value.Position player.Position
             let dir = getDirection target.Value.Position player.Position
             let projectile = (Projectile ((fst player.Position, snd player.Position), "🟢",  Map.empty, 2, canvas, world, dir))
             projectile.onHitEffect <- Some Effect.Poisoned
             projectile.Update ()
 
-type Fireblast () =
+and Fireblast () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Fireblast"
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) =
-        if target.IsSome then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
             let dis = getDistance target.Value.Position player.Position
             let dir = getDirection target.Value.Position player.Position
             let projectile = (Projectile ((fst player.Position, snd player.Position), "🔥",  Map.empty, 2, canvas, world, dir))
-            projectile.onHitEffect <- Some Effect.Poisoned
             projectile.Update ()
 
-type Freezenova () =
+and Freezenova () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
-
-    override this.coolDownTimer = _coolDownTimer
+    
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Freeze nova"
 
-type Lightningbolt () =
+and Lightningbolt () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Lightning bolt"
@@ -455,8 +377,8 @@ type Lightningbolt () =
 
 
 
-[<AbstractClass>]
-type InvItem () =
+
+and [<AbstractClass>] InvItem () =
     inherit Item ()
 
     abstract member name: string
@@ -472,7 +394,7 @@ type InvItem () =
     override this.FullyOccupy = false
 
 
-type Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
+and Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
     inherit InvItem ()
 
     let mutable _position = (0,0)
@@ -489,27 +411,23 @@ type Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) 
         |> Map.ofList
 
 
-let basicBow = Weapon ("Basic Bow", "🏹", 2, 1, 2)
-let basicSword = Weapon ("Basic Sword", "🗡", 2, 1, 1)
-let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
 
 
-type GameState = Playing | Paused | GameOver | Starting
 
 
-type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
-
-[<AbstractClass>]
-type RpgClass () =
-    abstract member startingWeapon: Weapon
+and [<AbstractClass>] RpgClass () =
+    let mutable _weapon: Weapon = Weapon("Fist", "👊", 1, 1, 1)
+    member __.StartingWeapon
+        with get () = _weapon
+        and set (value) = _weapon <- value
 
     abstract member spells: Spell list
 
     abstract member statMultipliers: Map<Stat, int>
 
 
-type Hunter () =
+and Hunter () =
     inherit RpgClass ()
     
 
@@ -534,7 +452,7 @@ type Hunter () =
         Stat.Critdamage, 2]
         |> Map.ofList
 
-type Warrior () =
+and Warrior () =
     inherit RpgClass ()
 
     override this.startingWeapon = basicSword
@@ -555,7 +473,7 @@ type Warrior () =
         Stat.Critdamage, 2]
         |> Map.ofList
 
-type Mage () =
+and Mage () =
     inherit RpgClass ()
 
     override this.startingWeapon = basicStaff
@@ -597,17 +515,54 @@ type Mage () =
 
 // MARK: Player
 
-type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity option * Item) [,]) =
-    inherit Creature (x,y, canvas, world)
+and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity option * Item) [,]) =
+    inherit Creature ()
 
+    let mutable _position = (x,y)
+    let mutable _hitPoints = 10
+    let mutable _isDead = false
     let mutable _target: Enemy option = None
+    let mutable _attackTimer = 0
+    let mutable _effect: Effect option = None
+    let mutable _effectTimer: int = 0
+
+    override this.EffectTimer
+        with get () = _effectTimer
+        and set (value) = _effectTimer <- value
+
+    override this.Effect
+        with get () = _effect
+        and set (value) = _effect <- value
     
     member this.Target = _target
 
+    override this.HitPoints
+        with get () = _hitPoints
+        and set (value) = _hitPoints <- value
+
+    override this.Position
+        with get () = _position
+        and set (value) = _position <- value
+
+    override this.IsDead
+        with get () = _isDead
+        and set (value) = _isDead <- value
+
+    override this.Damage (dmg: int) =
+        _hitPoints <- _hitPoints - dmg
+
+        if _hitPoints <= 0 then
+            this.Die ()
+    
     member this.RpgClass = rpgClass
     
-    override __.Die () =
-        __.IsDead <- true
+    member this.Die () =
+        _isDead <- true
+    
+    override this.Heal (h: int) =
+        _hitPoints <- _hitPoints + h
+
+
 
     member this.SwitchTarget () =
         let withinDistance (elm: (Entity option * Item)) =
@@ -618,7 +573,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
                 match object.Value with
                 | :? Enemy ->
                     let enemy = object.Value :?> Enemy
-                    if getDistance enemy.Position this.Position < 20 then Some enemy else None
+                    if getDistance enemy.Position _position < 20 then Some enemy else None
 
                 | _ -> None
             else None
@@ -637,20 +592,20 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     
     override this.Attack () =
 
-        let dis = getDistance _target.Value.Position this.Position
-        let dir = getDirection _target.Value.Position this.Position
+        let dis = getDistance _target.Value.Position _position
+        let dir = getDirection _target.Value.Position _position
 
         match rpgClass with
         | :? Hunter ->
             let icon = [Direction.Up, "⬆️ "; Direction.Down, "⬇️ "; Direction.Left, "⬅️ "; Direction.Right, " ⏩"] |> Map.ofList
-            (Projectile ((fst this.Position, snd this.Position), "⏺ ",  icon, 2, canvas, world, dir)).Update ()
+            (Projectile ((fst _position, snd _position), "⏺ ",  icon, 2, canvas, world, dir)).Update ()
 
         | :? Warrior -> if dis < 2 then _target.Value.Damage 3
 
-        | :? Mage -> (Projectile ((fst this.Position, snd this.Position), "🟠",  Map.empty, 2, canvas, world, dir)).Update ()
+        | :? Mage -> (Projectile ((fst _position, snd _position), "🟠",  Map.empty, 2, canvas, world, dir)).Update ()
         
         | _ -> ()
-        this.AttackTimer <- 5
+        _attackTimer <- 5
 
     override this.Icon =
         match rpgClass with
@@ -662,6 +617,28 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     member this.UpdateSpellTimers () =
         List.iter (fun (elm: Spell) -> elm.UpdateTimer ()) rpgClass.spells
 
+    member this.UpdateAttackCounter () =
+        if _attackTimer > 0 then _attackTimer <- _attackTimer - 1
+
+
+    override this.RenderOn (canvas: Canvas) =
+         let x,y = this.Position
+         let _, fg, bg = canvas.Get (x,y)
+         canvas.Set(x, y, this.Icon, fg, bg)
+
+    member this.MoveTo (x: int, y: int) =
+        let oldX,oldY = this.Position
+        let _, fg, bg = canvas.Get (oldX,oldY)
+        let field = world.[y,x]
+        let item = snd field
+        if not (fst field).IsSome && item.FullyOccupy = false then
+            canvas.Set(oldX, oldY, "  ", fg, bg)
+            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+            world.[y,x] <- (Some (this :> Entity), item)
+            this.Position <- (x,y)
+            item.InteractWith this
+        else
+            ()
     
 
     member this.HandleKeypress () =
@@ -673,11 +650,10 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         | System.ConsoleKey.DownArrow when y < worldSizeY - 1 -> y <- y + 1
         | System.ConsoleKey.LeftArrow when x > 0 -> x <- x - 1
         | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> x <- x + 1
-        | System.ConsoleKey.Spacebar when _target.IsSome -> if this.AttackTimer = 0 then this.Attack ()
+        | System.ConsoleKey.Spacebar when _target.IsSome -> if _attackTimer = 0 then this.Attack ()
         | System.ConsoleKey.Tab -> this.SwitchTarget ()
-        | System.ConsoleKey.D1 when _target.IsSome -> rpgClass.spells.[0].Cast (this :> Creature, Some (_target.Value :> Creature), canvas, world)
-        | System.ConsoleKey.D2 when _target.IsSome -> rpgClass.spells.[1].Cast (this :> Creature, Some (_target.Value :> Creature), canvas, world)
-        | System.ConsoleKey.D3 when _target.IsSome -> rpgClass.spells.[2].Cast (this :> Creature, Some (_target.Value :> Creature), canvas, world)
+        | System.ConsoleKey.D1  -> rpgClass.spells.[0].Cast (this, _target, canvas, world)
+        | System.ConsoleKey.D2 -> rpgClass.spells.[1].Cast (this, _target, canvas, world)
         | _ -> ()
 
         this.MoveTo (x, y)
@@ -702,27 +678,74 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
 
 // MARK: Enemy
 and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (Entity option * Item) [,]) =
-    inherit Creature (x,y, canvas, world)
+    inherit Creature ()
 
+    let world = world
+    let canvas = canvas
+    let player = player
     let mutable _spawnPoint = (x,y)
     let mutable _movingToSpawn = false
+    let mutable _position = _spawnPoint
+    let mutable _maxHealth = 10
+    let mutable _hitPoints = _maxHealth
+    let mutable _icon = icon
+    let mutable _isDead = false
     let mutable _isTarget = false
     let mutable _spawnTimer = 0
+    let mutable _effect: Effect option = None
+    let mutable _effectTimer: int = 0
 
+
+    let UpdateEffect () =
+        if _effectTimer > 0 then 
+            _effectTimer <- _effectTimer - 1
+        else if _effectTimer = 0 then _effect <- None
+
+    override this.Effect
+        with get () = _effect
+        and set (value) = _effect <- value
+
+    override this.HitPoints
+        with get () = _hitPoints
+        and set (value) = _hitPoints <- value
+
+    override this.Position
+        with get () = _position
+        and set (value) = _position <- value
+
+    override this.IsDead
+        with get () = _isDead
+        and set (value) = _isDead <- value
+
+    override this.EffectTimer
+        with get () = _effectTimer
+        and set (value) = _effectTimer <- value
+
+    override this.Damage (dmg: int) =
+        _hitPoints <- _hitPoints - dmg
+
+        if _hitPoints <= 0 then
+            this.Die ()
     
-    override __.Die () =
-        let x, y = __.Position
+    member this.Die () =
+        printfn "Dead"
+        let x, y = _position
         let item = snd world.[y,x]
         item.RenderOn canvas
         world.[y,x] <- (None, item)
         _spawnTimer <- 10
-        __.IsDead <- true
+        _isDead <- true
 
+
+    override this.Heal (h: int) =
+        _hitPoints <- _hitPoints + h
 
     member this.Target () = _isTarget <- true
     member this.RemoveTarget () = _isTarget <- false
 
-    override this.Attack () = if getDistance this.Position player.Position <= 1 then player.Damage 1  
+    override this.Attack () = if getDistance _position player.Position <= 1 then player.Damage 1  
+
+    override this.Icon = _icon
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
@@ -736,19 +759,19 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
 
     member this.Spawn () =
         if _spawnTimer <= 0 then
-            this.Position <- _spawnPoint
-            let x, y = this.Position
+            _position <- _spawnPoint
+            let x, y = _position
             let item = snd world.[y,x]
             item.RenderOn canvas
             world.[y,x] <- (Some (this :> Entity), item)
-            this.IsDead <- false
+            _isDead <- false
 
         else 
             _spawnTimer <- _spawnTimer - 1
 
     member this.MoveIn (direction: Direction) =
         
-        let oldX,oldY = this.Position
+        let oldX,oldY = _position
         let mutable newX, newY = oldX, oldY
         let _, fg, bg = canvas.Get (oldX,oldY)
 
@@ -759,20 +782,32 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
         | Direction.Right when oldX < worldSizeX - 2 -> newX <- oldX + 1
         | _ -> ()
         
-        this.MoveTo (newX, newY)
+
+        let field = world.[newY,newX]
+        let item = snd field
+        
+        if not (fst field).IsSome && item.FullyOccupy = false then
+            (snd world.[oldY, oldX]).RenderOn canvas
+            // canvas.Set(oldX, oldY, "  ", fg, bg)
+            world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+            
+            _position <- (newX,newY)
+            item.InteractWith this
+        else
+            ()
 
     member this.MoveToSpawn() =
-        let dis = getDistance _spawnPoint this.Position
+        let dis = getDistance _spawnPoint _position
 
         if dis < 3 then _movingToSpawn <- false
 
         if (dis > 30 || _movingToSpawn) then
             _movingToSpawn <- true
-            this.MoveIn (getDirection _spawnPoint this.Position)
+            this.MoveIn (getDirection _spawnPoint _position)
             
 
     member this.MoveTowardsPlayer () =
-        let dis = getDistance player.Position this.Position
+        let dis = getDistance player.Position _position
         let directions = [Direction.Left; Direction.Right; Direction.Up; Direction.Down]
 
         // Check if it should move to spawn
@@ -785,25 +820,25 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
             this.MoveIn directions.[dirInd]
         
         else if (_movingToSpawn = false) then
-            this.MoveIn (getDirection player.Position this.Position)
+            this.MoveIn (getDirection player.Position _position)
 
         
 
 
     override this.Update () =
-        if not this.IsDead then
-            this.UpdateEffect ()
-            match this.Effect with
+        if not _isDead then
+            UpdateEffect ()
+            match _effect with
             | Some Frozen ->
-                this.Icon <- "🥶"
+                _icon <- "🥶"
                 ()
             | Some Poisoned ->
-                this.Icon <- "🤢"
+                _icon <- "🤢"
                 this.Damage 5
                 this.MoveTowardsPlayer ()
                 this.Attack ()
             | _ ->
-                this.Icon <- icon
+                _icon <- icon
                 this.MoveTowardsPlayer ()
                 this.Attack ()
 
@@ -1013,6 +1048,9 @@ type World (canvas: Canvas, x:int, y:int) =
  
 
 
+let basicBow = Weapon ("Basic Bow", "🏹", 2, 1, 2)
+let basicSword = Weapon ("Basic Sword", "🗡", 2, 1, 1)
+let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
             
 
@@ -1140,4 +1178,4 @@ world.Play ()
 
 
 
-    
+   
