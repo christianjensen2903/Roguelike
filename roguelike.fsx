@@ -5,7 +5,7 @@ type Color = System.ConsoleColor
 type Direction = Left | Right | Down | Up
 
 let worldSizeX = 100
-let worldSizeY = 200
+let worldSizeY = 100
 let screenSizeX = 50
 let screenSizeY = 30
 
@@ -227,10 +227,6 @@ type Lightningbolt () =
 
 
 
-
-
-
-
 [<AbstractClass>]
 type InvItem () =
     inherit Item ()
@@ -275,6 +271,11 @@ type GameState = Playing | Paused | GameOver | Starting
 
 
 type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
+
+
+
+
+
 
 [<AbstractClass>]
 type RpgClass () =
@@ -422,23 +423,6 @@ type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direc
             else
                 this.Remove ()
         else ()
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // MARK: Player
 
@@ -864,7 +848,7 @@ type Water (startPosition) =
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
-         canvas.Set(x, y, "  ", Color.Green, Color.Green)
+         canvas.Set(x, y, "  ", Color.DarkBlue, Color.DarkBlue)
 
 
 
@@ -925,12 +909,10 @@ type Exit (startPosition) =
 
 
 
-
-
 // MARK: World
 
 type World (canvas: Canvas, x:int, y:int) =
-    let mutable _world: (Entity option * Item) [,] = Array2D.init x y (fun i j -> (None, (Grass (j, i) :> Item)))
+    let mutable _world: (Entity option * Item) [,] = Array2D.init y x (fun i j -> (None, (Grass (j, i) :> Item)))
     let mutable _gameState: GameState = GameState.Playing
     let mutable _enemies: Enemy list = []
 
@@ -975,9 +957,26 @@ type World (canvas: Canvas, x:int, y:int) =
         let deadEnemies = List.filter (fun (x: Enemy) -> x.IsDead) _enemies
         for i in deadEnemies do i.Update()
 
+    member this.Build (buildNumber, startPosition, endPosition) =
+        let startX, startY = fst startPosition, snd startPosition
+        let endX, endY = fst endPosition, snd endPosition
+
+        let fromX, toX = if startX <= endX then startX, endX else endX, startX
+        let fromY, toY = if startY <= endY then startY, endY else endY, startY
+
+        for y = fromY to toY do
+            for x = fromX to toX do
+                match buildNumber with
+                | 0 -> this.AddItem(Wall (y,x), y, x)
+                | 1 -> this.AddItem(Water (y,x), y, x)
+                | 2 -> this.AddItem(Fire (y,x), y, x)
+                | 3 -> this.AddItem(Grass (y,x), y, x)
+                | _ -> this.AddItem(FleshEatingPlant (y,x), y, x)
+                
+
     member this.Play () =
 
-        let player = Player (12,10, Hunter (),canvas, this.world)
+        let player = Player (70,70, Hunter (),canvas, this.world)
         let enemy = Enemy (0, 0, canvas, player, this.world)
         _enemies <- _enemies @ [enemy]
 
@@ -1025,16 +1024,107 @@ System.Console.Clear ()
 
 let world = World (test, worldSizeX, worldSizeY)
 
-let wall = Wall ((2,2))
-let wall2 = Wall ((5,5))
-let wall3 = Wall ((10,10))
-let wall4 = Fire ((7,7))
+// Drawing borders
+world.Build(0, (1,1), (1,worldSizeX-2))
+world.Build(0, (1,1), (worldSizeY-2, 1))
+world.Build(0, (worldSizeY-2, 1), (worldSizeY-2,worldSizeX-2))
+world.Build(0, (worldSizeY-2,worldSizeX-2), (1, worldSizeX-2))
 
-world.AddItem(wall, 2, 2)
-world.AddItem(wall2, 5, 5)
-world.AddItem(wall3, 10, 10)
-world.AddItem(wall4, 7, 7)
+// Water stream
+world.Build(1, (12,0), (12, 0))
+world.Build(1, (12,2), (12, 15))
+world.Build(1, (8,15), (16, 24))
 
+// Wall
+world.Build(0, (20, 2), (21, 8))
+world.Build(0, (20, 12), (21, 24))
+world.Build(0, (20, 35), (21, 50))
+
+// Fire wall
+world.Build(2, (22, 2), (22, 8))
+world.Build(2, (23, 2), (23, 7))
+world.Build(2, (24, 2), (24, 6))
+world.Build(2, (25, 2), (25, 5))
+world.Build(2, (26, 2), (26, 4))
+world.Build(2, (27, 2), (27, 3))
+world.Build(2, (28, 2), (28, 2))
+
+// Plants
+world.Build(4, (28, 10), (28, 10))
+world.Build(4, (35, 15), (35, 15))
+world.Build(4, (40, 10), (40, 10))
+
+// Arena
+world.Build(0, (50, 40), (50, 46))
+world.Build(0, (51, 40), (51, 45))
+world.Build(0, (52, 40), (52, 44))
+world.Build(0, (53, 40), (53, 43))
+world.Build(0, (54, 40), (54, 42))
+world.Build(0, (55, 40), (55, 41))
+world.Build(0, (56, 40), (56, 40))
+
+world.Build(0, (59, 40), (59, 40))
+world.Build(0, (60, 40), (60, 41))
+world.Build(0, (61, 40), (61, 42))
+world.Build(0, (62, 40), (62, 43))
+world.Build(0, (63, 40), (63, 44))
+world.Build(0, (64, 40), (64, 45))
+world.Build(0, (65, 40), (65, 46))
+
+world.Build(0, (65, 49), (65, 55))
+world.Build(0, (64, 50), (64, 55))
+world.Build(0, (63, 51), (63, 55))
+world.Build(0, (62, 52), (62, 55))
+world.Build(0, (61, 53), (61, 55))
+world.Build(0, (60, 54), (60, 55))
+world.Build(0, (59, 55), (59, 55))
+
+world.Build(0, (50, 49), (50, 55))
+world.Build(0, (51, 50), (51, 55))
+world.Build(0, (52, 51), (52, 55))
+world.Build(0, (53, 52), (53, 55))
+world.Build(0, (54, 53), (54, 55))
+world.Build(0, (55, 54), (55, 55))
+world.Build(0, (56, 55), (56, 55))
+
+// Weapon challenge
+world.Build(2, (26, 26), (41, 41))
+// Plant part in challenge
+world.Build(4, (32, 31), (36, 35))
+// Water part in challenge
+world.Build(1, (33, 32), (35, 34))
+world.Build(1, (33, 32), (35, 34))
+world.Build(3, (34, 33), (34, 33))
+// Route1 in challenge
+world.Build(3, (34, 36), (34, 37))
+world.Build(3, (35, 37), (35, 39))
+world.Build(3, (35, 39), (33, 39))
+world.Build(3, (33, 40), (33, 42))
+// Route2 in challenge
+world.Build(3, (37, 34), (37, 34))
+world.Build(3, (37, 35), (39, 35))
+world.Build(3, (39, 35), (39, 33))
+world.Build(3, (40, 33), (42, 33))
+
+
+// Enemy base1
+world.Build(0, (40, 55), (20, 72))
+world.Build(3, (38, 57), (22, 70))
+world.Build(3, (29, 55), (31, 57))
+world.Build(0, (30,60), (32,62))
+world.Build(0, (38,62), (40,64))
+world.Build(0, (24,62), (26,64))
+world.Build(0, (28,67), (34,70))
+world.Build(3, (29,68), (33,70))
+world.Build(3, (31,67), (31,67))
+
+
+// Enemy base with exit
+world.Build(0, (60, 60), (worldSizeY-1, worldSizeX-1))
+world.Build(3, (62, 62), (worldSizeY-3, worldSizeX-3))
+world.Build(0, (worldSizeY-1, 90), (90, worldSizeX-3))
+world.Build(3, (worldSizeY-3, 91), (91, worldSizeX-4))
+world.Build(3, (95, 90), (95, 90))
 
 world.Play ()
 
