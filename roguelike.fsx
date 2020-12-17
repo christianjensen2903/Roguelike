@@ -137,7 +137,6 @@ and [<AbstractClass>] Entity () =
     abstract member Icon: string
     default this.Icon = "  "
 
-
     
 
 
@@ -226,7 +225,6 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
     abstract member Attack: unit -> unit
 
     abstract member Die: unit -> unit
-    
 
 
 and [<AbstractClass>] Item () =
@@ -246,7 +244,7 @@ and [<AbstractClass>] Item () =
 
 
 
-type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direction,string>, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
+and Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direction,string>, dmg: int, canvas: Canvas, world: (Entity option * Item) [,], direction: Direction) =
     inherit Item ()
 
     let mutable _removed = false
@@ -331,59 +329,59 @@ type Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direc
 
 
 
-[<AbstractClass>]
-type Spell () =
+
+and [<AbstractClass>] Spell () =
+    let mutable _coolDownTimer = 0
     abstract member name: string
     abstract member baseDmg: int
     abstract member coolDown: int
-    abstract member coolDownTimer: int
+    
 
-    abstract member Cast: Creature * Creature option * Canvas * (Entity option * Item) [,] -> unit
-    default this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) = ()
+    abstract member Cast: Player * Enemy option * Canvas * (Entity option * Item) [,] -> unit
+    default this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) = ()
+    
+    member this.CoolDownTimer 
+        with get () = _coolDownTimer
+        and set (value) = _coolDownTimer <- value
 
-    abstract member UpdateTimer: unit -> unit
-    default this.UpdateTimer () = ()
+    member this.UpdateTimer () =
+        if _coolDownTimer > 0 then _coolDownTimer <- _coolDownTimer - 1
 
 
 
-type RapidFire () =
+and RapidFire () =
     inherit Spell ()
     let mutable _castCount = 0
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Rapid Fire"
 
 
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) = 
-        if target.IsSome && _coolDownTimer = 0 then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) = 
+        if target.IsSome && this.CoolDownTimer = 0 then
             player.Attack ()
             if _castCount = 2 then
-                _coolDownTimer <- this.coolDown
+                this.CoolDownTimer <- this.coolDown
                 _castCount <- 0
             else 
                 _castCount <- _castCount + 1
     
-    override this.UpdateTimer () =
-        if _coolDownTimer > 0 then _coolDownTimer <- _coolDownTimer - 1
 
 
         
     
 
-type FreezingShot () =
+and FreezingShot () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Freezing Shot"
 
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) =
-        if target.IsSome then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
             let dis = getDistance target.Value.Position player.Position
             let dir = getDirection target.Value.Position player.Position
             let projectile = (Projectile ((fst player.Position, snd player.Position), "🔷",  Map.empty, 2, canvas, world, dir))
@@ -391,52 +389,54 @@ type FreezingShot () =
             projectile.Update ()
 
 
-type Poisonshot () =
+and Poisonshot () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Poison Shot"
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) =
-        if target.IsSome then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
             let dis = getDistance target.Value.Position player.Position
             let dir = getDirection target.Value.Position player.Position
             let projectile = (Projectile ((fst player.Position, snd player.Position), "🟢",  Map.empty, 2, canvas, world, dir))
             projectile.onHitEffect <- Some Effect.Poisoned
             projectile.Update ()
 
-type Fireblast () =
+and Fireblast () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Fireblast"
-    override this.Cast (player: Creature, target: Creature option, canvas: Canvas, world: (Entity option * Item) [,]) =
-        if target.IsSome then
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
             let dis = getDistance target.Value.Position player.Position
             let dir = getDirection target.Value.Position player.Position
             let projectile = (Projectile ((fst player.Position, snd player.Position), "🔥",  Map.empty, 2, canvas, world, dir))
-            projectile.onHitEffect <- Some Effect.Poisoned
             projectile.Update ()
 
-type Freezenova () =
+and Freezenova () =
     inherit Spell ()
-    let mutable _coolDownTimer = 0
 
-    override this.coolDownTimer = _coolDownTimer
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Freeze nova"
 
-type Lightningbolt () =
-    inherit Spell ()
-    let mutable _coolDownTimer = 0
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if this.CoolDownTimer = 0 then
+            let nearbyEnemies: Enemy list = player.EnemiesWithin 5
+            printfn "%A" nearbyEnemies
+            for i = 0 to List.length nearbyEnemies - 1 do
+                nearbyEnemies.[i].EffectTimer <- 10
+                nearbyEnemies.[i].Effect <- Some Effect.Frozen
+            
 
-    override this.coolDownTimer = _coolDownTimer
+and Lightningbolt () =
+    inherit Spell ()
+
     override this.baseDmg = 5
     override this.coolDown = 15
     override this.name = "Lightning bolt"
@@ -451,8 +451,8 @@ type Lightningbolt () =
 
 
 
-[<AbstractClass>]
-type InvItem () =
+
+and [<AbstractClass>] InvItem () =
     inherit Item ()
 
     abstract member name: string
@@ -468,7 +468,7 @@ type InvItem () =
     override this.FullyOccupy = false
 
 
-type Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
+and Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) =
     inherit InvItem ()
 
     let mutable _position = (0,0)
@@ -485,34 +485,28 @@ type Weapon (name: string, icon: string, dmg: int, spellpower: int, speed: int) 
         |> Map.ofList
 
 
-let basicBow = Weapon ("Basic Bow", "🏹", 2, 1, 2)
-let basicSword = Weapon ("Basic Sword", "🗡", 2, 1, 1)
-let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
 
 
-[<AbstractClass>]
-type RpgClass () =
-    abstract member startingWeapon: Weapon
+
+
+and [<AbstractClass>] RpgClass () =
+    let startWeapon: Weapon = Weapon ("Fist", "👊", 1,1,1)
 
     abstract member spells: Spell list
 
     abstract member statMultipliers: Map<Stat, int>
 
 
-type Hunter () =
+and Hunter () =
     inherit RpgClass ()
     
-
     let _spells: Spell list = 
         [RapidFire ();
         FreezingShot ();
         Poisonshot ()]
     
-
     override this.spells = _spells
-
-    override this.startingWeapon = basicBow
 
     override this.statMultipliers =
         [Stat.Damage, 2;
@@ -525,10 +519,8 @@ type Hunter () =
         Stat.Critdamage, 2]
         |> Map.ofList
 
-type Warrior () =
+and Warrior () =
     inherit RpgClass ()
-
-    override this.startingWeapon = basicSword
 
     override this.spells =
         [RapidFire ();
@@ -546,10 +538,9 @@ type Warrior () =
         Stat.Critdamage, 2]
         |> Map.ofList
 
-type Mage () =
+and Mage () =
     inherit RpgClass ()
 
-    override this.startingWeapon = basicStaff
 
     override this.spells =
         [Fireblast ();
@@ -577,9 +568,10 @@ type Mage () =
 
 
 
+    
 
 
-
+        
 
 
 
@@ -588,7 +580,7 @@ type Mage () =
 
 // MARK: Player
 
-type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity option * Item) [,]) =
+and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity option * Item) [,]) =
     inherit Creature (x,y, canvas, world)
 
     let mutable _target: Enemy option = None
@@ -606,7 +598,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         __.IsDead <- true
 
 
-    member this.SwitchTarget () =
+    member this.EnemiesWithin (distance: int) =
         let withinDistance (elm: (Entity option * Item)) =
             let object = fst elm
             if _target.IsSome then _target.Value.RemoveTarget ()
@@ -615,7 +607,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
                 match object.Value with
                 | :? Enemy ->
                     let enemy = object.Value :?> Enemy
-                    if getDistance enemy.Position this.Position < 20 then Some enemy else None
+                    if getDistance enemy.Position this.Position < distance then Some enemy else None
 
                 | _ -> None
             else None
@@ -625,7 +617,11 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
                 for y in [0..(Array2D.length2 world) - 1] do
                     let enemy = withinDistance(world.[x, y])
                     if enemy.IsSome then nearbyEnemies <- nearbyEnemies @ [enemy.Value]
+        nearbyEnemies
 
+    member this.SwitchTarget () =
+        
+        let nearbyEnemies = this.EnemiesWithin 20
         if List.length nearbyEnemies - 1 >= 0 then
             let target = nearbyEnemies.[randomNumber 0 (List.length nearbyEnemies - 1)]
             _target <- Some target
@@ -672,9 +668,9 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         | System.ConsoleKey.RightArrow when x < worldSizeX - 1 -> x <- x + 1
         | System.ConsoleKey.Spacebar when _target.IsSome -> if this.AttackTimer = 0 then this.Attack ()
         | System.ConsoleKey.Tab -> this.SwitchTarget ()
-        | System.ConsoleKey.D1 when _target.IsSome -> rpgClass.spells.[0].Cast (this :> Creature, Some (_target.Value :> Creature), canvas, world)
-        | System.ConsoleKey.D2 when _target.IsSome -> rpgClass.spells.[1].Cast (this :> Creature, Some (_target.Value :> Creature), canvas, world)
-        | System.ConsoleKey.D3 when _target.IsSome -> rpgClass.spells.[2].Cast (this :> Creature, Some (_target.Value :> Creature), canvas, world)
+        | System.ConsoleKey.D1 -> rpgClass.spells.[0].Cast (this, _target, canvas, world)
+        | System.ConsoleKey.D2 -> rpgClass.spells.[1].Cast (this, _target, canvas, world)
+        | System.ConsoleKey.D3 -> rpgClass.spells.[2].Cast (this, _target, canvas, world)
         | _ -> ()
 
         this.MoveTo (x, y)
@@ -799,6 +795,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
             this.UpdateEffect ()
             match this.Effect with
             | Some Frozen ->
+                printfn "test2"
                 this.Icon <- "🥶"
                 ()
             | Some Poisoned ->
@@ -956,9 +953,9 @@ type World (canvas: Canvas, x:int, y:int) =
             "Player:                                     ";
             sprintf "HP: %A                              " player.HitPoints;
             "Spells:                                     ";
-            sprintf "1 - %s: %A                          " player.RpgClass.spells.[0].name player.RpgClass.spells.[0].coolDownTimer;
-            sprintf "2 - %s: %A                          " player.RpgClass.spells.[1].name player.RpgClass.spells.[1].coolDownTimer;
-            sprintf "3 - %s: %A                          " player.RpgClass.spells.[2].name player.RpgClass.spells.[2].coolDownTimer;
+            sprintf "1 - %s: %A                          " player.RpgClass.spells.[0].name player.RpgClass.spells.[0].CoolDownTimer;
+            sprintf "2 - %s: %A                          " player.RpgClass.spells.[1].name player.RpgClass.spells.[1].CoolDownTimer;
+            sprintf "3 - %s: %A                          " player.RpgClass.spells.[2].name player.RpgClass.spells.[2].CoolDownTimer;
             "Target:                                     ";
             sprintf "%s                                  " (if player.Target.IsSome then sprintf "HP: %A" player.Target.Value.HitPoints else "No enemy targeted")] |> String.concat "\n"
             // "test"
@@ -979,7 +976,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (12,10, Hunter (),canvas, this.world)
+        let player = Player (12,10, Mage (),canvas, this.world)
         let enemy = Enemy (0, 0, "🧟‍♀️",canvas, player, this.world)
         _enemies <- _enemies @ [enemy]
 
@@ -1041,7 +1038,9 @@ world.AddItem(wall4, 7, 7)
 world.Play ()
 
 
-
+let basicBow = Weapon ("Basic Bow", "🏹", 2, 1, 2)
+let basicSword = Weapon ("Basic Sword", "🗡", 2, 1, 1)
+let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
 
 
