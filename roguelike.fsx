@@ -3,6 +3,8 @@
 type Color = System.ConsoleColor
 type Direction = Left | Right | Down | Up
 type Effect = Frozen | Poisoned
+type GameState = Playing | Paused | GameOver | Starting
+type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
 
 let worldSizeX = 100
 let worldSizeY = 200
@@ -135,9 +137,6 @@ and [<AbstractClass>] Entity () =
     abstract member Icon: string
     default this.Icon = "  "
 
-    member __.AddEntity entity = _entities <- entity :: _entities
-
-    member __.AddEntitiesTo canvas = List.iter (fun (e: Entity) -> e.RenderOn canvas) _entities 
 
     
 
@@ -492,11 +491,6 @@ let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
 
 
-type GameState = Playing | Paused | GameOver | Starting
-
-
-type Stat = Damage | Health | Spellpower | Armor | Speed | MagicResistance | Critchance | Critdamage
-
 [<AbstractClass>]
 type RpgClass () =
     abstract member startingWeapon: Weapon
@@ -602,21 +596,11 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     let mutable _effect: Effect option = None
     let mutable _effectTimer: int = 0
 
-
-    override this.Damage (dmg: int) =
-        _hitPoints <- _hitPoints - dmg
-
-        if _hitPoints <= 0 then
-            this.Die ()
     
     member this.RpgClass = rpgClass
-    
-    member this.Die () =
-        _isDead <- true
     
     member this.Target = _target
 
-    member this.RpgClass = rpgClass
     
     override __.Die () =
         __.IsDead <- true
@@ -665,12 +649,12 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         | _ -> ()
         this.AttackTimer <- 5
 
-    override this.Icon =
+    member this.SetIcon () =
         match rpgClass with
-        | :? Hunter -> "🧝🏼‍♀️"
-        | :? Warrior -> "🥷🏼"
-        | :? Mage -> "🧙🏼‍♂️"
-        | _ -> "👨🏼‍💼"
+        | :? Hunter -> this.Icon <- "🧝🏼‍♀️"
+        | :? Warrior -> this.Icon <- "🥷🏼"
+        | :? Mage -> this.Icon <- "🧙🏼‍♂️"
+        | _ -> this.Icon <- "👨🏼‍💼"
 
     member this.UpdateSpellTimers () =
         List.iter (fun (elm: Spell) -> elm.UpdateTimer ()) rpgClass.spells
@@ -700,6 +684,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         this.UpdateSpellTimers ()
 
     override this.Update () =
+        this.SetIcon ()
         this.HandleKeypress ()
         this.RenderOn (canvas)
         
@@ -725,10 +710,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
     let mutable _effectTimer: int = 0
 
 
-    let UpdateEffect () =
-        if _effectTimer > 0 then 
-            _effectTimer <- _effectTimer - 1
-        else if _effectTimer = 0 then _effect <- None
+    
 
     
     override __.Die () =
@@ -751,21 +733,9 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
          world.[y,x] <- (Some (this :> Entity), snd world.[y,x])
 
          if _isTarget then
-            canvas.Set(x, y, _icon, Color.Red, bg)
+            canvas.Set(x, y, this.Icon, Color.Red, bg)
          else
-            canvas.Set(x, y, _icon, fg, bg)
-
-    member this.Spawn () =
-        if _spawnTimer <= 0 then
-            _position <- _spawnPoint
-            let x, y = _position
-            let item = snd world.[y,x]
-            item.RenderOn canvas
-            world.[y,x] <- (Some (this :> Entity), item)
-            _isDead <- false
-
-        else 
-            _spawnTimer <- _spawnTimer - 1
+            canvas.Set(x, y, this.Icon, fg, bg)
 
     member this.Spawn () =
         if _spawnTimer <= 0 then
@@ -778,6 +748,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
 
         else 
             _spawnTimer <- _spawnTimer - 1
+
 
     member this.MoveIn (direction: Direction) =
         
