@@ -126,8 +126,6 @@ type Canvas (rows: int, cols: int) =
 
 
 and [<AbstractClass>] Entity () =
-
-    let mutable _entities: Entity list = []
     abstract member RenderOn: Canvas -> unit
     default this.RenderOn (canvas: Canvas) = ()
 
@@ -600,6 +598,21 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     inherit Creature (x,y, canvas, world)
 
     let mutable _target: Enemy option = None
+    let mutable _attackTimer = 0
+    let mutable _effect: Effect option = None
+    let mutable _effectTimer: int = 0
+
+
+    override this.Damage (dmg: int) =
+        _hitPoints <- _hitPoints - dmg
+
+        if _hitPoints <= 0 then
+            this.Die ()
+    
+    member this.RpgClass = rpgClass
+    
+    member this.Die () =
+        _isDead <- true
     
     member this.Target = _target
 
@@ -607,6 +620,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     
     override __.Die () =
         __.IsDead <- true
+
 
     member this.SwitchTarget () =
         let withinDistance (elm: (Entity option * Item)) =
@@ -707,6 +721,14 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
     let mutable _movingToSpawn = false
     let mutable _isTarget = false
     let mutable _spawnTimer = 0
+    let mutable _effect: Effect option = None
+    let mutable _effectTimer: int = 0
+
+
+    let UpdateEffect () =
+        if _effectTimer > 0 then 
+            _effectTimer <- _effectTimer - 1
+        else if _effectTimer = 0 then _effect <- None
 
     
     override __.Die () =
@@ -729,9 +751,21 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
          world.[y,x] <- (Some (this :> Entity), snd world.[y,x])
 
          if _isTarget then
-            canvas.Set(x, y, this.Icon, Color.Red, bg)
+            canvas.Set(x, y, _icon, Color.Red, bg)
          else
-            canvas.Set(x, y, this.Icon, fg, bg)
+            canvas.Set(x, y, _icon, fg, bg)
+
+    member this.Spawn () =
+        if _spawnTimer <= 0 then
+            _position <- _spawnPoint
+            let x, y = _position
+            let item = snd world.[y,x]
+            item.RenderOn canvas
+            world.[y,x] <- (Some (this :> Entity), item)
+            _isDead <- false
+
+        else 
+            _spawnTimer <- _spawnTimer - 1
 
     member this.Spawn () =
         if _spawnTimer <= 0 then
