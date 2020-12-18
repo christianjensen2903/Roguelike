@@ -72,6 +72,7 @@ type Canvas (rows: int, cols: int) =
         
         let cutout = _screen.[fromY .. toY, fromX .. toX]
 
+        printfn "%A %A" fromX toX
         for y = 0 to screenSizeY - 1 do
             for x = 0 to screenSizeX - 1 do
                 let c, fg, bg = cutout.[y,x]
@@ -430,7 +431,8 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
     inherit Creature ()
 
     let mutable _position = (x,y)
-    let mutable _hitPoints = 10
+    let _maxHitPoints = 10
+    let mutable _hitPoints = _maxHitPoints
     let mutable _isDead = false
     let mutable _target: Enemy option = None
     let mutable _attackTimer = 0
@@ -461,8 +463,7 @@ type Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity op
         _isDead <- true
     
     override this.Heal (h: int) =
-        _hitPoints <- _hitPoints + h
-
+        _hitPoints <- if _hitPoints >= _maxHitPoints then _hitPoints else _hitPoints + h
 
 
     member this.SwitchTarget () =
@@ -643,7 +644,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
 
 
     override this.Heal (h: int) =
-        _hitPoints <- _hitPoints + h
+        _hitPoints <- if _hitPoints >= _maxHealth then _hitPoints else _hitPoints + h
 
     member this.Target () = _isTarget <- true
     member this.RemoveTarget () = _isTarget <- false
@@ -661,7 +662,7 @@ and Enemy (x:int, y:int, canvas: Canvas, player: Player, world: (Entity option *
         if dis <= 1 then
             player.Damage 1
     
-    override this.Icon = "🧟‍♀️"
+    override this.Icon = "🧟"
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
@@ -861,7 +862,9 @@ type Fire (startPosition) =
     override this.Position = startPosition
 
     override this.InteractWith (creature: Creature) =
-        if isBurning then creature.Damage 1
+        if isBurning then 
+            creature.Damage 1 
+            interactions <- interactions + 1
 
         if interactions >= 5 then isBurning <- false
 
@@ -976,13 +979,13 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (70,70, Hunter (),canvas, this.world)
-        let enemy = Enemy (0, 0, canvas, player, this.world)
+        let player = Player (10,10, Hunter (),canvas, this.world)
+        let enemy = Enemy (25, 10, canvas, player, this.world)
         _enemies <- _enemies @ [enemy]
 
         player.RenderOn canvas
         enemy.RenderOn canvas
-        canvas.Show (fst player.Position, snd player.Position)
+        //canvas.Show (fst player.Position, snd player.Position)
 
         while _gameState = GameState.Playing do
 
