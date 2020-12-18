@@ -146,18 +146,22 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
     inherit Entity ()
 
     let mutable _position = (x,y)
-    let mutable _maxHealth = 10
-    let mutable _hitPoints = _maxHealth
+    let mutable _hitPoints = 1
     let mutable _isDead = false
     let mutable _target: Creature option = None
     let mutable _attackTimer = 0
     let mutable _effect: Effect option = None
     let mutable _effectTimer: int = 0
     let mutable _icon: string = ""
+    let mutable _level: int = 1
 
     member __.Position
         with get () = _position
         and set (value) = _position <- value
+
+    member __.Level
+        with get () = _level
+        and set (value) = _level <- value
 
     member __.Icon
         with get () = _icon
@@ -191,7 +195,10 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
 
     
     member __.Heal (h: int) =
-        _hitPoints <- _hitPoints + h       
+        if _hitPoints + h > __.MaxHealth then
+            _hitPoints <- __.MaxHealth
+        else
+            _hitPoints <- _hitPoints + h       
     
 
     member __.UpdateEffect () =
@@ -222,7 +229,7 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         else
             ()
 
-
+    abstract member MaxHealth: int
     abstract member Attack: unit -> unit
 
     abstract member Die: unit -> unit
@@ -586,15 +593,36 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
     let mutable _attackTimer = 0
     let mutable _effect: Effect option = None
     let mutable _effectTimer: int = 0
+    let mutable _xp: int = 0
 
-    
+    member this.XP = _xp
+    member this.XPTarget = this.Level * 100
+
+    override this.MaxHealth =
+        let healthMultiplier =
+            let mulOption: int option = rpgClass.statMultipliers.TryFind Stat.Spellpower
+            if mulOption.IsSome then
+                mulOption.Value
+            else 1
+
+        this.Level * healthMultiplier * 10
+
     member this.RpgClass = rpgClass
     
     member this.Target = _target
 
+    member this.GainXP amount =
+        _xp <- amount
+        if _xp >= this.XPTarget then
+            this.Level <- this.Level + 1
+            this.GainXP (this.XPTarget - _xp)
+            
     
     override __.Die () =
         __.IsDead <- true
+
+    member this.LevelUp =
+        this.Level <- this.Level + 1
 
 
     member this.EnemiesWithin (distance: int) =
@@ -706,7 +734,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
 
 
     
-
+    override this.MaxHealth = player.Level * 10
     
     override __.Die () =
         let x, y = __.Position
@@ -715,6 +743,9 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
         world.[y,x] <- (None, item)
         _spawnTimer <- 10
         __.IsDead <- true
+        __.EffectTimer <- 0
+        __.Effect <- None
+        player.GainXP (__.Level * 10)
 
 
     member this.Target () = _isTarget <- true
@@ -740,6 +771,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
             item.RenderOn canvas
             world.[y,x] <- (Some (this :> Entity), item)
             this.IsDead <- false
+            this.HitPoints <- this.MaxHealth
 
         else 
             _spawnTimer <- _spawnTimer - 1
@@ -950,13 +982,16 @@ type World (canvas: Canvas, x:int, y:int) =
     member this.SetHUD (player: Player) =
         let text = [
             "Player:                                     ";
-            sprintf "HP: %A                              " player.HitPoints;
+            sprintf "HP: %A/%A                           " player.HitPoints player.MaxHealth;
+            sprintf "Lvl: %A                             " player.Level;
+            sprintf "XP: %A/%A                           " player.XP player.XPTarget;
             "Spells:                                     ";
             sprintf "1 - %s: %A                          " player.RpgClass.spells.[0].name player.RpgClass.spells.[0].CoolDownTimer;
             sprintf "2 - %s: %A                          " player.RpgClass.spells.[1].name player.RpgClass.spells.[1].CoolDownTimer;
             sprintf "3 - %s: %A                          " player.RpgClass.spells.[2].name player.RpgClass.spells.[2].CoolDownTimer;
-            "Target:                                     ";
-            sprintf "%s                                  " (if player.Target.IsSome then sprintf "HP: %A" player.Target.Value.HitPoints else "No enemy targeted")] |> String.concat "\n"
+            "\nTarget:                                     ";
+            sprintf "%s                                  " (if player.Target.IsSome then sprintf "HP: %A/%A" player.Target.Value.HitPoints player.Target.Value.MaxHealth else "No enemy targeted");
+            sprintf "%s                                  " (if player.Target.IsSome then sprintf "Lvl: %A" player.Target.Value.Level else "")] |> String.concat "\n"
             
 
         canvas.SetHUD text
