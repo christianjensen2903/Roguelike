@@ -624,10 +624,12 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
     member this.Target = _target
 
     member this.GainXP amount =
-        _xp <- amount
+        _xp <- amount + _xp
         if _xp >= this.XPTarget then
             this.Level <- this.Level + 1
-            this.GainXP (this.XPTarget - _xp)
+            let remains = this.XPTarget - _xp
+            _xp <- 0
+            this.GainXP (remains)
             
     
     override __.Die () =
@@ -850,7 +852,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
                 this.Icon <- icon
                 this.MoveTowardsPlayer ()
                 this.Attack ()
-                
+
             if not this.IsDead then
                 this.RenderOn canvas
         else this.Spawn ()
