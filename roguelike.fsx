@@ -441,6 +441,14 @@ and Lightningbolt () =
     override this.coolDown = 15
     override this.name = "Lightning bolt"
 
+    override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
+        if target.IsSome && this.CoolDownTimer = 0 then
+            this.CoolDownTimer <- this.coolDown
+            let dis = getDistance target.Value.Position player.Position
+            let dir = getDirection target.Value.Position player.Position
+            let projectile = (Projectile ((fst player.Position, snd player.Position), "〽️",  Map.empty, 2, canvas, world, dir))
+            projectile.Update ()
+
 
 
 
@@ -958,13 +966,6 @@ type World (canvas: Canvas, x:int, y:int) =
             sprintf "3 - %s: %A                          " player.RpgClass.spells.[2].name player.RpgClass.spells.[2].CoolDownTimer;
             "Target:                                     ";
             sprintf "%s                                  " (if player.Target.IsSome then sprintf "HP: %A" player.Target.Value.HitPoints else "No enemy targeted")] |> String.concat "\n"
-            // "test"
-            
-            // 
-        //     player.HitPoints
-        //     player.RpgClass.spells.[0].name player.RpgClass.spells.[0].coolDownTimer
-        //     player.RpgClass.spells.[1].name player.RpgClass.spells.[1].coolDownTimer
-        //     player.RpgClass.spells.[2].name player.RpgClass.spells.[2].coolDownTimer
             
 
         canvas.SetHUD text
@@ -976,7 +977,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (12,10, Mage (),canvas, this.world)
+        let player = Player (12,10, Hunter (),canvas, this.world)
         let enemy = Enemy (0, 0, "🧟‍♀️",canvas, player, this.world)
         _enemies <- _enemies @ [enemy]
 
