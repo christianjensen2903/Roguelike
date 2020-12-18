@@ -154,6 +154,7 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
     let mutable _effectTimer: int = 0
     let mutable _icon: string = ""
     let mutable _level: int = 1
+    let mutable _outOfCombatTimer = 50
 
     member __.Position
         with get () = _position
@@ -167,6 +168,10 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         with get () = _icon
         and set (value) = _icon <- value
 
+    member __.OutOfCombatTimer
+        with get () = _outOfCombatTimer
+        and set (value) = _outOfCombatTimer <- value
+
     member __.AttackTimer
         with get () = _attackTimer
         and set (value) = _attackTimer <- value
@@ -179,6 +184,12 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         with get () = _effect
         and set (value) = _effect <- value
 
+    member __.IsOutOfCombat () =
+        __.OutOfCombatTimer <- __.OutOfCombatTimer + 1
+        if __.OutOfCombatTimer >= 50 then
+            __.Heal (__.MaxHealth / 20 + 1)
+
+
     member __.HitPoints
         with get () = _hitPoints
         and set (value) = _hitPoints <- value
@@ -188,6 +199,7 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         and set (value) = _isDead <- value
 
     member __.Damage (dmg: int) =
+        _outOfCombatTimer <- 0
         _hitPoints <- _hitPoints - dmg
 
         if _hitPoints <= 0 then
@@ -221,8 +233,8 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         let field = world.[y,x]
         let item = snd field
         if not (fst field).IsSome && item.FullyOccupy = false then
-            canvas.Set(oldX, oldY, "  ", fg, bg)
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
+            (snd world.[oldY, oldX]).RenderOn canvas
             world.[y,x] <- (Some (this :> Entity), item)
             this.Position <- (x,y)
             item.InteractWith this
@@ -268,7 +280,7 @@ and Projectile (startPosition: (int * int), deficon: string, dirIcon: Map<Direct
 
     override this.InteractWith (creature: Creature) =
         if _onHitEffect.IsSome then creature.EffectTimer <- 20
-        creature.Effect <- _onHitEffect
+        if _onHitEffect.IsSome then creature.Effect <- _onHitEffect
         creature.Damage dmg
 
     override this.FullyOccupy = false
@@ -600,7 +612,7 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
 
     override this.MaxHealth =
         let healthMultiplier =
-            let mulOption: int option = rpgClass.statMultipliers.TryFind Stat.Spellpower
+            let mulOption: int option = rpgClass.statMultipliers.TryFind Stat.Health
             if mulOption.IsSome then
                 mulOption.Value
             else 1
@@ -705,6 +717,7 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
     member this.UpdateCounters () =
         this.UpdateAttackCounter ()
         this.UpdateSpellTimers ()
+        this.IsOutOfCombat ()
 
     override this.Update () =
         this.SetIcon ()
@@ -739,8 +752,8 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
     override __.Die () =
         let x, y = __.Position
         let item = snd world.[y,x]
-        item.RenderOn canvas
         world.[y,x] <- (None, item)
+        item.RenderOn canvas
         _spawnTimer <- 10
         __.IsDead <- true
         __.EffectTimer <- 0
@@ -824,22 +837,22 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
     override this.Update () =
         if not this.IsDead then
             this.UpdateEffect ()
+            this.IsOutOfCombat ()
             match this.Effect with
             | Some Frozen ->
-                printfn "test2"
                 this.Icon <- "🥶"
-                ()
             | Some Poisoned ->
                 this.Icon <- "🤢"
-                this.Damage 5
+                this.Damage (1 * player.Level)
                 this.MoveTowardsPlayer ()
                 this.Attack ()
             | _ ->
                 this.Icon <- icon
                 this.MoveTowardsPlayer ()
                 this.Attack ()
-
-            this.RenderOn canvas
+                
+            if not this.IsDead then
+                this.RenderOn canvas
         else this.Spawn ()
 
 
@@ -989,7 +1002,7 @@ type World (canvas: Canvas, x:int, y:int) =
             sprintf "1 - %s: %A                          " player.RpgClass.spells.[0].name player.RpgClass.spells.[0].CoolDownTimer;
             sprintf "2 - %s: %A                          " player.RpgClass.spells.[1].name player.RpgClass.spells.[1].CoolDownTimer;
             sprintf "3 - %s: %A                          " player.RpgClass.spells.[2].name player.RpgClass.spells.[2].CoolDownTimer;
-            "\nTarget:                                     ";
+            "\nTarget:                                   ";
             sprintf "%s                                  " (if player.Target.IsSome then sprintf "HP: %A/%A" player.Target.Value.HitPoints player.Target.Value.MaxHealth else "No enemy targeted");
             sprintf "%s                                  " (if player.Target.IsSome then sprintf "Lvl: %A" player.Target.Value.Level else "")] |> String.concat "\n"
             
