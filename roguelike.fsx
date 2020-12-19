@@ -80,9 +80,7 @@ type Canvas (rows: int, cols: int) =
             for x = 0 to Array2D.length2 _screen - 1 do
                 let c, fg, bg = _screen.[y,x]
                 
-                
                 System.Console.ForegroundColor <- fg
-
                 System.Console.BackgroundColor <- bg
                     
                 System.Console.Write(c)
@@ -184,7 +182,7 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         with get () = _effect
         and set (value) = _effect <- value
 
-    member __.IsOutOfCombat () =
+    member __.CheckOutOfCombat () =
         __.OutOfCombatTimer <- __.OutOfCombatTimer + 1
         if __.OutOfCombatTimer >= 50 then
             __.Heal (__.MaxHealth / 20 + 1)
@@ -719,7 +717,7 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
     member this.UpdateCounters () =
         this.UpdateAttackCounter ()
         this.UpdateSpellTimers ()
-        this.IsOutOfCombat ()
+        this.CheckOutOfCombat ()
 
     override this.Update () =
         this.SetIcon ()
@@ -839,7 +837,7 @@ and Enemy (x:int, y:int, icon: string, canvas: Canvas, player: Player, world: (E
     override this.Update () =
         if not this.IsDead then
             this.UpdateEffect ()
-            this.IsOutOfCombat ()
+            this.CheckOutOfCombat ()
             match this.Effect with
             | Some Frozen ->
                 this.Icon <- "🥶"
@@ -979,6 +977,7 @@ type World (canvas: Canvas, x:int, y:int) =
     let mutable _gameState: GameState = GameState.Playing
     let mutable _enemies: Enemy list = []
 
+    let mutable player = Player (6,6,Hunter (), canvas, _world)
     
 
     member this.world = _world
@@ -987,12 +986,8 @@ type World (canvas: Canvas, x:int, y:int) =
          _world.[y,x] <- (fst _world.[y,x], item)
          item.RenderOn canvas
 
-    member this.StateKeeper () =
-        match _gameState with
-        | Playing -> this.Play()
-        | Paused -> ()
-        | Starting -> ()
-        | GameOver -> ()
+    
+    member this.SetPlayer p = player <- p
 
     member this.SetHUD (player: Player) =
         let text = [
@@ -1035,7 +1030,7 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.Play () =
 
-        let player = Player (12,10, Hunter (),canvas, this.world)
+        
         let enemy = Enemy (6, 6, "🧟‍♀️",canvas, player, this.world)
         _enemies <- _enemies @ [enemy]
 
@@ -1067,6 +1062,110 @@ type World (canvas: Canvas, x:int, y:int) =
                 System.Threading.Thread.Sleep(250)
 
             player.Update ()
+
+    
+    member this.BuildWorld () =
+        // Drawing borders
+        this.Build(0, (1,1), (1,worldSizeX-2))
+        this.Build(0, (1,1), (worldSizeY-2, 1))
+        this.Build(0, (worldSizeY-2, 1), (worldSizeY-2,worldSizeX-2))
+        this.Build(0, (worldSizeY-2,worldSizeX-2), (1, worldSizeX-2))
+
+        // Water stream
+        this.Build(1, (12,0), (12, 0))
+        this.Build(1, (12,2), (12, 15))
+        this.Build(1, (8,15), (16, 24))
+
+        // Wall
+        this.Build(0, (20, 2), (21, 8))
+        this.Build(0, (20, 12), (21, 24))
+        this.Build(0, (20, 35), (21, 50))
+
+        // Fire wall
+        this.Build(2, (22, 2), (22, 8))
+        this.Build(2, (23, 2), (23, 7))
+        this.Build(2, (24, 2), (24, 6))
+        this.Build(2, (25, 2), (25, 5))
+        this.Build(2, (26, 2), (26, 4))
+        this.Build(2, (27, 2), (27, 3))
+        this.Build(2, (28, 2), (28, 2))
+
+        // Plants
+        this.Build(4, (28, 10), (28, 10))
+        this.Build(4, (35, 15), (35, 15))
+        this.Build(4, (40, 10), (40, 10))
+
+        // Arena
+        this.Build(0, (50, 40), (50, 46))
+        this.Build(0, (51, 40), (51, 45))
+        this.Build(0, (52, 40), (52, 44))
+        this.Build(0, (53, 40), (53, 43))
+        this.Build(0, (54, 40), (54, 42))
+        this.Build(0, (55, 40), (55, 41))
+        this.Build(0, (56, 40), (56, 40))
+
+        this.Build(0, (59, 40), (59, 40))
+        this.Build(0, (60, 40), (60, 41))
+        this.Build(0, (61, 40), (61, 42))
+        this.Build(0, (62, 40), (62, 43))
+        this.Build(0, (63, 40), (63, 44))
+        this.Build(0, (64, 40), (64, 45))
+        this.Build(0, (65, 40), (65, 46))
+
+        this.Build(0, (65, 49), (65, 55))
+        this.Build(0, (64, 50), (64, 55))
+        this.Build(0, (63, 51), (63, 55))
+        this.Build(0, (62, 52), (62, 55))
+        this.Build(0, (61, 53), (61, 55))
+        this.Build(0, (60, 54), (60, 55))
+        this.Build(0, (59, 55), (59, 55))
+
+        this.Build(0, (50, 49), (50, 55))
+        this.Build(0, (51, 50), (51, 55))
+        this.Build(0, (52, 51), (52, 55))
+        this.Build(0, (53, 52), (53, 55))
+        this.Build(0, (54, 53), (54, 55))
+        this.Build(0, (55, 54), (55, 55))
+        this.Build(0, (56, 55), (56, 55))
+
+        // Weapon challenge
+        this.Build(2, (26, 26), (41, 41))
+        // Plant part in challenge
+        this.Build(4, (32, 31), (36, 35))
+        // Water part in challenge
+        this.Build(1, (33, 32), (35, 34))
+        this.Build(1, (33, 32), (35, 34))
+        this.Build(3, (34, 33), (34, 33))
+        // Route1 in challenge
+        this.Build(3, (34, 36), (34, 37))
+        this.Build(3, (35, 37), (35, 39))
+        this.Build(3, (35, 39), (33, 39))
+        this.Build(3, (33, 40), (33, 42))
+        // Route2 in challenge
+        this.Build(3, (37, 34), (37, 34))
+        this.Build(3, (37, 35), (39, 35))
+        this.Build(3, (39, 35), (39, 33))
+        this.Build(3, (40, 33), (42, 33))
+
+
+        // Enemy base1
+        this.Build(0, (40, 55), (20, 72))
+        this.Build(3, (38, 57), (22, 70))
+        this.Build(3, (29, 55), (31, 57))
+        this.Build(0, (30,60), (32,62))
+        this.Build(0, (38,62), (40,64))
+        this.Build(0, (24,62), (26,64))
+        this.Build(0, (28,67), (34,70))
+        this.Build(3, (29,68), (33,70))
+        this.Build(3, (31,67), (31,67))
+
+
+        // Enemy base with exit
+        this.Build(0, (60, 60), (worldSizeY-1, worldSizeX-1))
+        this.Build(3, (62, 62), (worldSizeY-3, worldSizeX-3))
+        this.Build(0, (worldSizeY-1, 90), (90, worldSizeX-3))
+        this.Build(3, (worldSizeY-3, 91), (91, worldSizeX-4))
+        this.Build(3, (95, 90), (95, 90))
             
             
             
@@ -1077,115 +1176,7 @@ type World (canvas: Canvas, x:int, y:int) =
             
 
 
-let test = Canvas (200,200)
 
-System.Console.Clear ()
-
-let world = World (test, worldSizeX, worldSizeY)
-
-// Drawing borders
-world.Build(0, (1,1), (1,worldSizeX-2))
-world.Build(0, (1,1), (worldSizeY-2, 1))
-world.Build(0, (worldSizeY-2, 1), (worldSizeY-2,worldSizeX-2))
-world.Build(0, (worldSizeY-2,worldSizeX-2), (1, worldSizeX-2))
-
-// Water stream
-world.Build(1, (12,0), (12, 0))
-world.Build(1, (12,2), (12, 15))
-world.Build(1, (8,15), (16, 24))
-
-// Wall
-world.Build(0, (20, 2), (21, 8))
-world.Build(0, (20, 12), (21, 24))
-world.Build(0, (20, 35), (21, 50))
-
-// Fire wall
-world.Build(2, (22, 2), (22, 8))
-world.Build(2, (23, 2), (23, 7))
-world.Build(2, (24, 2), (24, 6))
-world.Build(2, (25, 2), (25, 5))
-world.Build(2, (26, 2), (26, 4))
-world.Build(2, (27, 2), (27, 3))
-world.Build(2, (28, 2), (28, 2))
-
-// Plants
-world.Build(4, (28, 10), (28, 10))
-world.Build(4, (35, 15), (35, 15))
-world.Build(4, (40, 10), (40, 10))
-
-// Arena
-world.Build(0, (50, 40), (50, 46))
-world.Build(0, (51, 40), (51, 45))
-world.Build(0, (52, 40), (52, 44))
-world.Build(0, (53, 40), (53, 43))
-world.Build(0, (54, 40), (54, 42))
-world.Build(0, (55, 40), (55, 41))
-world.Build(0, (56, 40), (56, 40))
-
-world.Build(0, (59, 40), (59, 40))
-world.Build(0, (60, 40), (60, 41))
-world.Build(0, (61, 40), (61, 42))
-world.Build(0, (62, 40), (62, 43))
-world.Build(0, (63, 40), (63, 44))
-world.Build(0, (64, 40), (64, 45))
-world.Build(0, (65, 40), (65, 46))
-
-world.Build(0, (65, 49), (65, 55))
-world.Build(0, (64, 50), (64, 55))
-world.Build(0, (63, 51), (63, 55))
-world.Build(0, (62, 52), (62, 55))
-world.Build(0, (61, 53), (61, 55))
-world.Build(0, (60, 54), (60, 55))
-world.Build(0, (59, 55), (59, 55))
-
-world.Build(0, (50, 49), (50, 55))
-world.Build(0, (51, 50), (51, 55))
-world.Build(0, (52, 51), (52, 55))
-world.Build(0, (53, 52), (53, 55))
-world.Build(0, (54, 53), (54, 55))
-world.Build(0, (55, 54), (55, 55))
-world.Build(0, (56, 55), (56, 55))
-
-// Weapon challenge
-world.Build(2, (26, 26), (41, 41))
-// Plant part in challenge
-world.Build(4, (32, 31), (36, 35))
-// Water part in challenge
-world.Build(1, (33, 32), (35, 34))
-world.Build(1, (33, 32), (35, 34))
-world.Build(3, (34, 33), (34, 33))
-// Route1 in challenge
-world.Build(3, (34, 36), (34, 37))
-world.Build(3, (35, 37), (35, 39))
-world.Build(3, (35, 39), (33, 39))
-world.Build(3, (33, 40), (33, 42))
-// Route2 in challenge
-world.Build(3, (37, 34), (37, 34))
-world.Build(3, (37, 35), (39, 35))
-world.Build(3, (39, 35), (39, 33))
-world.Build(3, (40, 33), (42, 33))
-
-
-// Enemy base1
-world.Build(0, (40, 55), (20, 72))
-world.Build(3, (38, 57), (22, 70))
-world.Build(3, (29, 55), (31, 57))
-world.Build(0, (30,60), (32,62))
-world.Build(0, (38,62), (40,64))
-world.Build(0, (24,62), (26,64))
-world.Build(0, (28,67), (34,70))
-world.Build(3, (29,68), (33,70))
-world.Build(3, (31,67), (31,67))
-
-
-// Enemy base with exit
-world.Build(0, (60, 60), (worldSizeY-1, worldSizeX-1))
-world.Build(3, (62, 62), (worldSizeY-3, worldSizeX-3))
-world.Build(0, (worldSizeY-1, 90), (90, worldSizeX-3))
-world.Build(3, (worldSizeY-3, 91), (91, worldSizeX-4))
-world.Build(3, (95, 90), (95, 90))
-
-world.Play ()
 
 
 let basicBow = Weapon ("Basic Bow", "🏹", 2, 1, 2)
@@ -1200,93 +1191,82 @@ let basicStaff = Weapon ("Basic Staff", "🪄", 1, 3, 1)
 
 // MARK: Start Menu
 
-// type StartMenu (canvas: Canvas) =
+type StartMenu (canvas: Canvas) =
 
-//     let mutable _selection = 0
+    let mutable _selection = 0
 
 
-//     member this.DrawMenu (options: string list) =
+    member this.DrawMenu (options: string list) =
        
-//         let padding = 1
-//         let optionsLength = List.length options
-//         for i in 0 .. optionsLength - 1 do
-//             let option = options.[i]
-//             let mutable x = worldSizeX / 2 - (String.length option) / 2
-//             let y = worldSizeY / 2 - optionsLength / 2 * (padding + 1) + i * (padding + 1)
+        let padding = 1
+        let optionsLength = List.length options
+        for i in 0 .. optionsLength - 1 do
+            let option = options.[i]
+            let mutable x = screenSizeX / 2 - (String.length option) / 2 - 1
+            let y = screenSizeY / 2 - optionsLength / 2 * (padding + 1) + i * (padding + 1)
             
-//             for char in Seq.toList option do
+            let stringToPrint =
+                let optionLength = List.length (Seq.toList option)
+                let mutable string = option
+                for i in 0 .. optionLength / 2 do
+                    string <- " " + string + " "
+                string
 
-//                 if _selection = i then
-//                     // If selection is the same as option make text another color
-//                     canvas.Set (x, y, string char, Color.DarkBlue, Color.Black) 
-//                 else
-//                     canvas.Set (x, y, string char, Color.DarkBlue, Color.White)
+            for char in Seq.toList stringToPrint do
 
-//                 x <- x + 1
+                if _selection = i then
+                    // If selection is the same as option make text another color
+                    canvas.Set (x, y, string char, Color.DarkGreen, Color.Black) 
+                else
+                    canvas.Set (x, y, string char, Color.DarkGreen, Color.White)
+
+                x <- x + 1
         
-//         canvas.Show ()
+        canvas.ShowMenu ()
 
-//     member this.ControlMenu (options: string list) =
-//         let mutable showMenu = true
-//         while showMenu do
-//             let key = System.Console.ReadKey()
+    member this.ControlMenu (options: string list) =
+        let mutable showMenu = true
+        while showMenu do
+            let key = System.Console.ReadKey()
 
-//             match key.Key with
-//             | System.ConsoleKey.UpArrow -> 
-//                 if _selection > 0 then 
-//                     _selection <- _selection - 1
-//             | System.ConsoleKey.DownArrow -> 
-//                 if _selection < List.length options - 1 then 
-//                     _selection <- _selection + 1
-//             | System.ConsoleKey.Enter ->
-//                 showMenu <- false
-//             | _ -> ()
+            match key.Key with
+            | System.ConsoleKey.UpArrow -> 
+                if _selection > 0 then 
+                    _selection <- _selection - 1
+            | System.ConsoleKey.DownArrow -> 
+                if _selection < List.length options - 1 then 
+                    _selection <- _selection + 1
+            | System.ConsoleKey.Enter ->
+                match _selection with
+                    | 0 -> this.StartGameWith (Warrior ())
+                    | 1 -> this.StartGameWith (Hunter ())
+                    | 2 -> this.StartGameWith (Mage ())
+                    | _ -> ()
+            | _ -> ()
 
-//             this.DrawMenu options
-        
-//     member this.MenuScreen () =
-
-//         let menuOptions = ["New Game"; "Continue Game"]
-
-//         canvas.Show ()
-//         this.DrawMenu menuOptions
-        
-//         this.ControlMenu menuOptions
-
-        
-//         match _selection with
-//             | 0 ->
-//                 this.ClassScreen ()
-//             | 1 ->
-//                 // Continue game
-//                 ()
-//             | _ -> ()
+            this.DrawMenu options
     
-//     member this.ClassScreen () =
+    member this.ClassScreen () =
 
-//         let classesOptions = ["Warrior"; "Hunter"; "Mage"]
+        let classesOptions = ["Warrior"; "Hunter"; "Mage"]
 
-//         canvas.ResetScreen ()
-//         this.DrawMenu classesOptions
+        this.DrawMenu classesOptions
 
-//         this.ControlMenu classesOptions
-        
-//         // TODO: convert classes to fsharp classes
-//         match _selection with
-//             | 0 ->
-//                 // Select warrior
-//                 ()
-//             | 1 ->
-//                 // Select hunter
-//                 ()
-//             | 2 ->
-//                 // Select mage
-//                 ()
-//             | _ -> ()
+        this.ControlMenu classesOptions
+      
 
+    member this.StartGameWith (rpgClass: RpgClass) =
+        let newCanvas = Canvas (200,200)
+        System.Console.Clear ()
+        let world = World (newCanvas, worldSizeX, worldSizeY)
+        world.BuildWorld ()
+        let player = Player (12,10, rpgClass,newCanvas, world.world)
+        world.SetPlayer player
+        world.Play ()
 
-// let canvas = Canvas (20,40)
+System.Console.Clear ()
+let canvas = Canvas (screenSizeX,screenSizeY)
 
-// let menu = StartMenu canvas
+let menu = StartMenu canvas
 
-// menu.MenuScreen ()
+menu.ClassScreen ()
