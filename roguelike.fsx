@@ -685,10 +685,10 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
 
     member this.SetIcon () =
         match rpgClass with
-        | :? Hunter -> this.Icon <- "🧝🏼‍♀️"
+        | :? Hunter -> this.Icon <- "🧝"
         | :? Warrior -> this.Icon <- "🥷🏼"
-        | :? Mage -> this.Icon <- "🧙🏼‍♂️"
-        | _ -> this.Icon <- "👨🏼‍💼"
+        | :? Mage -> this.Icon <- "🧙"
+        | _ -> this.Icon <- "👨"
 
     member this.UpdateSpellTimers () =
         List.iter (fun (elm: Spell) -> elm.UpdateTimer ()) rpgClass.spells
@@ -1030,7 +1030,7 @@ type World (canvas: Canvas, x:int, y:int) =
     member this.Play () =
 
         
-        let enemy = Enemy (6, 6, "🧟‍♀️",canvas, player, this.world)
+        let enemy = Enemy (6, 6, "🧟",canvas, player, this.world)
         _enemies <- _enemies @ [enemy]
 
         player.RenderOn canvas
