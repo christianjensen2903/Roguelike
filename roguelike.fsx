@@ -108,7 +108,6 @@ type Canvas (rows: int, cols: int) =
         
         let cutout = _screen.[fromY .. toY, fromX .. toX]
 
-        printfn "%A %A" fromX toX
         for y = 0 to screenSizeY - 1 do
             for x = 0 to screenSizeX - 1 do
                 let c, fg, bg = cutout.[y,x]
