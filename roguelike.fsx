@@ -91,7 +91,7 @@ type Canvas (rows: int, cols: int) =
         // System.Console.Clear ()
         System.Console.CursorVisible <- false
         System.Console.SetCursorPosition(0,0)
-
+        
         let fromX, toX = 
             if playerX - (screenSizeX / 2) < 0 then
                 0, screenSizeX - 1
@@ -454,7 +454,6 @@ and Freezenova () =
     override this.Cast (player: Player, target: Enemy option, canvas: Canvas, world: (Entity option * Item) [,]) =
         if this.CoolDownTimer = 0 then
             let nearbyEnemies: Enemy list = player.EnemiesWithin 5
-            printfn "%A" nearbyEnemies
             for i = 0 to List.length nearbyEnemies - 1 do
                 nearbyEnemies.[i].EffectTimer <- 10
                 nearbyEnemies.[i].Effect <- Some Effect.Frozen
@@ -962,7 +961,7 @@ type Exit (startPosition) =
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
-         canvas.Set(x, y, "  ", Color.Green, Color.Green)
+         canvas.Set(x, y, "🚪", Color.Green, Color.Green)
 
 
 
@@ -976,7 +975,7 @@ type World (canvas: Canvas, x:int, y:int) =
     let mutable _gameState: GameState = GameState.Playing
     let mutable _enemies: Enemy list = []
 
-    let mutable player = Player (6,6,Hunter (), canvas, _world)
+    let mutable player = Player (56,61,Hunter (), canvas, _world)
     
 
     member this.world = _world
@@ -985,8 +984,15 @@ type World (canvas: Canvas, x:int, y:int) =
          _world.[y,x] <- (fst _world.[y,x], item)
          item.RenderOn canvas
 
+    member this.AddObject (object: Entity, x:int, y:int) =
+         _world.[y,x] <- (Some object, snd _world.[y,x])
+         object.RenderOn canvas
+
     
-    member this.SetPlayer p = player <- p
+    member this.SetPlayer (p: Player) = 
+        (x,y) = p.Position
+        this.AddObject (p, 56, 61)
+        player <- p
 
     member this.SetHUD (player: Player) =
         let text = [
@@ -1062,8 +1068,48 @@ type World (canvas: Canvas, x:int, y:int) =
 
             player.Update ()
 
+    member this.AddEnemies () =
+        // Zombie camp
+        this.AddObject (Enemy (9,30, "🧟‍♀️", canvas, player, _world), 9, 30)
+        this.AddObject (Enemy (9,32, "🧟‍♂️", canvas, player, _world), 9, 30)
+        this.AddObject (Enemy (12,31, "🧟", canvas, player, _world), 9, 30)
+        this.AddObject (Enemy (8,34, "🧟‍♀️", canvas, player, _world), 9, 30)
+
+        // Vampire house
+        this.AddObject (Enemy (59,27, "🧛🏻‍♀️", canvas, player, _world), 59, 27)
+        this.AddObject (Enemy (60,36, "🧛🏻‍♀️", canvas, player, _world), 60, 36)
+        this.AddObject (Enemy (62,36, "🦇", canvas, player, _world), 62, 36)
+
+        // Wizard gathering
+        this.AddObject (Enemy (45,54, "🧙🏼", canvas, player, _world), 45, 54)
+        this.AddObject (Enemy (45,60, "🧙🏼", canvas, player, _world), 45, 60)
+        this.AddObject (Enemy (50,54, "🧙🏼", canvas, player, _world), 50, 54)
+        this.AddObject (Enemy (50,60, "🧙🏼", canvas, player, _world), 50, 60)
+
+        // Grass field
+        this.AddObject (Enemy (22,85, "🐅", canvas, player, _world), 22, 85)
+        this.AddObject (Enemy (26,90, "🐅", canvas, player, _world), 26, 90)
+        this.AddObject (Enemy (24,93, "🐅", canvas, player, _world), 24, 93)
+
+        // Lake
+        this.AddObject (Enemy (22,11, "🐊", canvas, player, _world), 22, 11)
+        this.AddObject (Enemy (24,13, "🐊", canvas, player, _world), 24, 13)
+        this.AddObject (Enemy (20,10, "🐢", canvas, player, _world), 20, 10)
+
+        // Exit guards
+        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 58, 93)
+        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 56, 94)
+        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 58, 92)
+        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 54, 92)
+        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 56, 93)
+        
+
     
     member this.BuildWorld () =
+
+        // Exit
+        this.AddItem (Exit(59,97), 59,97)
+
         // Drawing borders
         this.Build(0, (1,1), (1,worldSizeX-2))
         this.Build(0, (1,1), (worldSizeY-2, 1))
@@ -1259,8 +1305,9 @@ type StartMenu (canvas: Canvas) =
         System.Console.Clear ()
         let world = World (newCanvas, worldSizeX, worldSizeY)
         world.BuildWorld ()
-        let player = Player (12,10, rpgClass,newCanvas, world.world)
+        let player = Player (56,61, rpgClass,newCanvas, world.world)
         world.SetPlayer player
+        world.AddEnemies ()
         world.Play ()
 
 System.Console.Clear ()
