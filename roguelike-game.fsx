@@ -1,6 +1,8 @@
+open roguelike
+System.Console.Clear ()
 
-//let canvas = roguelike.Canvas(200, 200)
+let canvas = Canvas(50, 30)
 
-//let menu = roguelike.StartMenu canvas
+let menu = StartMenu canvas
 
-//menu.ClassScreen ()
+menu.ClassScreen ()

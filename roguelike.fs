@@ -1,4 +1,4 @@
-//module roguelike
+module roguelike
 // open System
 
 type Color = System.ConsoleColor
@@ -1427,7 +1427,7 @@ type StartMenu (canvas: Canvas) =
     ///<summary>Instantiates the world and new canvas</summary>
     ///<input name="rpgClass">The class the player picked from the menu</input>
     member this.StartGameWith (rpgClass: RpgClass) =
-        let newCanvas = Canvas (200,200)
+        let newCanvas = Canvas (100,100)
         System.Console.Clear ()
         let world = World (newCanvas, worldSizeX, worldSizeY)
         world.BuildWorld ()
@@ -1436,10 +1436,10 @@ type StartMenu (canvas: Canvas) =
         world.AddEnemies ()
         world.Play ()
 
-System.Console.Clear ()
-let canvas = Canvas (screenSizeX,screenSizeY)
+//System.Console.Clear ()
+//let canvas = Canvas (screenSizeX,screenSizeY)
 
-let menu = StartMenu canvas
+//let menu = StartMenu canvas
 
 // Shows the class Screen as the first thing when the program starts
-menu.ClassScreen ()
+//menu.ClassScreen ()
