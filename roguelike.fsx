@@ -1148,7 +1148,6 @@ type World (canvas: Canvas, x:int, y:int) =
     member this.win () =
         _gameState <- GameState.GameOver
         System.Console.Clear ()
-        printfn "You won!!!!"
 
     ///<summary>Instantiates player and enemies and start the game as well as updating the state of the game</summary>
     member this.Play () =
