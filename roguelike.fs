@@ -262,12 +262,12 @@ and [<AbstractClass>] Creature (x:int, y:int, canvas: Canvas, world: (Entity opt
         let _, fg, bg = canvas.Get (oldX,oldY)
         let field = world.[y,x]
         let item = snd field
+        item.InteractWith this
         if not (fst field).IsSome && item.FullyOccupy = false then
             world.[oldY, oldX] <- (None, snd world.[oldY, oldX])
             (snd world.[oldY, oldX]).RenderOn canvas
             world.[y,x] <- (Some (this :> Entity), item)
             this.Position <- (x,y)
-            item.InteractWith this
         else
             ()
 
@@ -1038,7 +1038,7 @@ type FleshEatingPlant (startPosition) =
     // Bites the player dealing damage
     override this.InteractWith (creature: Creature) = creature.Damage 5
 
-    override this.FullyOccupy = true
+    override this.FullyOccupy = false
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
