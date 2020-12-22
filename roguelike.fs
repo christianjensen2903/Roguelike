@@ -1218,10 +1218,10 @@ type World (canvas: Canvas, x:int, y:int) =
 
         // Exit guards
         this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 58, 93)
-        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 56, 94)
-        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 58, 92)
-        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 54, 92)
-        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 56, 93)
+        this.AddObject (Enemy (56,93, "💂", canvas, player, _world), 56, 93)
+        this.AddObject (Enemy (58,91, "💂", canvas, player, _world), 58, 91)
+        this.AddObject (Enemy (58,92, "💂", canvas, player, _world), 58, 92)
+        this.AddObject (Enemy (58,90, "💂", canvas, player, _world), 58, 90)
         
 
     
