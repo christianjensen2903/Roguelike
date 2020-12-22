@@ -698,9 +698,6 @@ and Player (x:int, y:int, rpgClass: RpgClass, canvas: Canvas, world: (Entity opt
     override __.Die () =
         __.IsDead <- true
 
-    member this.LevelUp =
-        this.Level <- this.Level + 1
-
     ///<summary>Finds all the enemies within a certain distance</summary>
     ///<input name="distance">The radius</input>
     ///<returns>A list of enemies</returns>
@@ -1049,16 +1046,15 @@ type FleshEatingPlant (startPosition) =
 
 ///<summary>The Exit class inheriting from the Item Interface</summary>
 ///<input name="startPosition">The Exit positon in the world</input>
-type Exit (startPosition) =
+///<input name="world">The Exit positon in the world</input>
+type Exit (startPosition, winFunction) =
     inherit Item ()
 
     override this.Position = startPosition
 
     // Wins the game
     override this.InteractWith (creature: Creature) = 
-        // Show end game notice
-        System.Console.Clear ()
-        printfn "You won!!!!"
+        winFunction()
 
     override this.FullyOccupy = false
 
@@ -1148,7 +1144,12 @@ type World (canvas: Canvas, x:int, y:int) =
                 | 2 -> this.AddItem(Fire (y,x), y, x)
                 | 3 -> this.AddItem(Grass (y,x), y, x)
                 | _ -> this.AddItem(FleshEatingPlant (y,x), y, x)
-                
+
+    member this.win () =
+        _gameState <- GameState.GameOver
+        System.Console.Clear ()
+        printfn "You won!!!!"
+
     ///<summary>Instantiates player and enemies and start the game as well as updating the state of the game</summary>
     member this.Play () =
 
@@ -1187,21 +1188,21 @@ type World (canvas: Canvas, x:int, y:int) =
 
     member this.AddEnemies () =
         // Zombie camp
-        this.AddObject (Enemy (9,30, "🧟‍♀️", canvas, player, _world), 9, 30)
+        this.AddObject (Enemy (9,30, "🧟", canvas, player, _world), 9, 30)
         this.AddObject (Enemy (9,32, "🧟‍♂️", canvas, player, _world), 9, 30)
         this.AddObject (Enemy (12,31, "🧟", canvas, player, _world), 9, 30)
-        this.AddObject (Enemy (8,34, "🧟‍♀️", canvas, player, _world), 9, 30)
+        this.AddObject (Enemy (8,34, "🧟", canvas, player, _world), 9, 30)
 
         // Vampire house
-        this.AddObject (Enemy (59,27, "🧛🏻‍♀️", canvas, player, _world), 59, 27)
-        this.AddObject (Enemy (60,36, "🧛🏻‍♀️", canvas, player, _world), 60, 36)
+        this.AddObject (Enemy (59,27, "🧛", canvas, player, _world), 59, 27)
+        this.AddObject (Enemy (60,36, "🧛", canvas, player, _world), 60, 36)
         this.AddObject (Enemy (62,36, "🦇", canvas, player, _world), 62, 36)
 
         // Wizard gathering
-        this.AddObject (Enemy (45,54, "🧙🏼", canvas, player, _world), 45, 54)
-        this.AddObject (Enemy (45,60, "🧙🏼", canvas, player, _world), 45, 60)
-        this.AddObject (Enemy (50,54, "🧙🏼", canvas, player, _world), 50, 54)
-        this.AddObject (Enemy (50,60, "🧙🏼", canvas, player, _world), 50, 60)
+        this.AddObject (Enemy (45,54, "🧙", canvas, player, _world), 45, 54)
+        this.AddObject (Enemy (45,60, "🧙", canvas, player, _world), 45, 60)
+        this.AddObject (Enemy (50,54, "🧙", canvas, player, _world), 50, 54)
+        this.AddObject (Enemy (50,60, "🧙", canvas, player, _world), 50, 60)
 
         // Grass field
         this.AddObject (Enemy (22,85, "🐅", canvas, player, _world), 22, 85)
@@ -1214,18 +1215,18 @@ type World (canvas: Canvas, x:int, y:int) =
         this.AddObject (Enemy (20,10, "🐢", canvas, player, _world), 20, 10)
 
         // Exit guards
-        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 58, 93)
-        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 56, 94)
-        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 58, 92)
-        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 54, 92)
-        this.AddObject (Enemy (58,93, "💂🏻‍♀️", canvas, player, _world), 56, 93)
+        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 58, 93)
+        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 56, 94)
+        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 58, 92)
+        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 54, 92)
+        this.AddObject (Enemy (58,93, "💂", canvas, player, _world), 56, 93)
         
 
     
     member this.BuildWorld () =
 
         // Exit
-        this.AddItem (Exit(59,97), 59,97)
+        this.AddItem (Exit ((59,97), this.win), 59,97)
 
         // Drawing borders
         this.Build(0, (1,1), (1,worldSizeX-2))
