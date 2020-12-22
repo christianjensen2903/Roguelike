@@ -1,3 +1,4 @@
+//module roguelike
 // open System
 
 type Color = System.ConsoleColor
@@ -1053,8 +1054,10 @@ type Exit (startPosition, winFunction) =
     override this.Position = startPosition
 
     // Wins the game
-    override this.InteractWith (creature: Creature) = 
-        winFunction()
+    override this.InteractWith (creature: Creature) =
+        if creature :? Player then
+            winFunction()
+        else ()
 
     override this.FullyOccupy = false
 
