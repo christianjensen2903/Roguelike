@@ -1038,7 +1038,7 @@ type FleshEatingPlant (startPosition) =
     // Bites the player dealing damage
     override this.InteractWith (creature: Creature) = creature.Damage 5
 
-    override this.FullyOccupy = false
+    override this.FullyOccupy = true
 
     override this.RenderOn (canvas: Canvas) =
          let x,y = this.Position
